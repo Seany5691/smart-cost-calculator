@@ -34,10 +34,40 @@ export default function Layout({ children }: LayoutProps) {
     };
   }, [setOnlineStatus]);
 
-  // Initialize config store on app load
+  // Initialize config store and users on app load
   useEffect(() => {
     loadFromAPI();
+    const { initializeUsers } = useAuthStore.getState();
+    initializeUsers();
   }, [loadFromAPI]);
+
+  // Set up periodic sync and storage event listener
+  useEffect(() => {
+    // Sync every 30 seconds to ensure data consistency
+    const syncInterval = setInterval(() => {
+      const configStore = useConfigStore.getState();
+      configStore.loadFromGlobalStorage();
+    }, 30000);
+
+    // Listen for storage changes from other tabs
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'smart-cost-calculator-global-config' && e.newValue) {
+        const configStore = useConfigStore.getState();
+        configStore.loadFromGlobalStorage();
+      }
+      if (e.key === 'smart-cost-calculator-global-users' && e.newValue) {
+        const authStore = useAuthStore.getState();
+        authStore.loadUsersFromGlobalStorage();
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+
+    return () => {
+      clearInterval(syncInterval);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []);
 
   // Show password change modal if user requires password change
   useEffect(() => {

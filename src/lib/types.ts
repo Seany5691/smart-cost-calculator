@@ -84,6 +84,9 @@ export interface AuthState {
   deleteUser: (id: string) => void;
   changePassword: (userId: string, newPassword: string) => void;
   resetPassword: (userId: string, newPassword: string) => void;
+  syncUsersToGlobalStorage: () => void;
+  loadUsersFromGlobalStorage: () => boolean;
+  initializeUsers: () => void;
 }
 
 export interface CalculatorState {

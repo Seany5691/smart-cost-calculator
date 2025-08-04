@@ -20,19 +20,30 @@ export const useCalculatorStore = create<CalculatorState>()(
       dealDetails: DEFAULT_DEAL_DETAILS,
 
       initializeStore: async () => {
+        console.log('Initializing calculator store...');
         const configStore = useConfigStore.getState();
         
         // Ensure config store is loaded
         if (!configStore.scales || !configStore.factors) {
+          console.log('Config store not initialized, loading from API...');
           await configStore.loadFromAPI();
         }
         
+        // Get fresh state after loading
+        const freshConfigStore = useConfigStore.getState();
+        console.log('Fresh config store state:', {
+          hasScales: !!freshConfigStore.scales,
+          hasFactors: !!freshConfigStore.factors,
+          additionalCosts: freshConfigStore.scales?.additional_costs
+        });
+        
         const sections = [
-          { id: 'hardware', name: 'Hardware', items: configStore.hardware },
-          { id: 'connectivity', name: 'Connectivity', items: configStore.connectivity },
-          { id: 'licensing', name: 'Licensing', items: configStore.licensing }
+          { id: 'hardware', name: 'Hardware', items: freshConfigStore.hardware },
+          { id: 'connectivity', name: 'Connectivity', items: freshConfigStore.connectivity },
+          { id: 'licensing', name: 'Licensing', items: freshConfigStore.licensing }
         ];
         set({ sections });
+        console.log('Calculator store initialized successfully');
       },
 
       updateSectionItem: (sectionId: string, itemId: string, updates: Partial<Item>) => {
@@ -116,6 +127,15 @@ export const useCalculatorStore = create<CalculatorState>()(
       calculateTotalCosts: (): TotalCosts => {
         const { sections, dealDetails } = get();
         const configStore = useConfigStore.getState();
+        
+        // Debug logging
+        console.log('Config store state:', {
+          scales: configStore.scales,
+          factors: configStore.factors,
+          hasScales: !!configStore.scales,
+          hasFactors: !!configStore.factors,
+          additionalCosts: configStore.scales?.additional_costs
+        });
         
         // Ensure config store is available
         if (!configStore.scales || !configStore.factors) {
@@ -213,7 +233,7 @@ export const useCalculatorStore = create<CalculatorState>()(
           .reduce((sum, item) => sum + (getItemCost(item, user?.role || 'user') * item.quantity), 0);
 
         // Calculate additional costs with null checks
-        const additionalCosts = configStore.scales?.additional_costs ? 
+        const additionalCosts = configStore.scales?.additional_costs?.cost_per_kilometer && configStore.scales?.additional_costs?.cost_per_point ? 
           (dealDetails.distanceToInstall * configStore.scales.additional_costs.cost_per_kilometer) +
           (extensionCount * configStore.scales.additional_costs.cost_per_point) : 0;
 

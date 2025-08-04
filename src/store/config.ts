@@ -18,6 +18,10 @@ interface ConfigState {
   
   // Load from API (read-only)
   loadFromAPI: () => Promise<void>;
+  
+  // Global sync functions
+  syncToGlobalStorage: () => void;
+  loadFromGlobalStorage: () => boolean;
 }
 
 // Default configurations
@@ -149,6 +153,9 @@ const DEFAULT_SCALES: Scales = {
   }
 };
 
+// Global storage key for cross-browser synchronization
+const GLOBAL_CONFIG_KEY = 'smart-cost-calculator-global-config';
+
 export const useConfigStore = create<ConfigState>()(
   persist(
     (set, get) => ({
@@ -160,26 +167,86 @@ export const useConfigStore = create<ConfigState>()(
 
       updateHardware: (items: Item[]) => {
         set({ hardware: items });
+        // Sync to global storage immediately
+        get().syncToGlobalStorage();
       },
 
       updateConnectivity: (items: Item[]) => {
         set({ connectivity: items });
+        // Sync to global storage immediately
+        get().syncToGlobalStorage();
       },
 
       updateLicensing: (items: Item[]) => {
         set({ licensing: items });
+        // Sync to global storage immediately
+        get().syncToGlobalStorage();
       },
 
       updateFactors: (factors: FactorData) => {
         set({ factors });
+        // Sync to global storage immediately
+        get().syncToGlobalStorage();
       },
 
       updateScales: (scales: Scales) => {
         set({ scales });
+        // Sync to global storage immediately
+        get().syncToGlobalStorage();
+      },
+
+      syncToGlobalStorage: () => {
+        if (typeof window !== 'undefined') {
+          const state = get();
+          const globalData = {
+            hardware: state.hardware,
+            connectivity: state.connectivity,
+            licensing: state.licensing,
+            factors: state.factors,
+            scales: state.scales,
+            lastUpdated: new Date().toISOString()
+          };
+          localStorage.setItem(GLOBAL_CONFIG_KEY, JSON.stringify(globalData));
+          console.log('Config synced to global storage');
+        }
+      },
+
+      loadFromGlobalStorage: () => {
+        if (typeof window !== 'undefined') {
+          try {
+            const globalData = localStorage.getItem(GLOBAL_CONFIG_KEY);
+            if (globalData) {
+              const parsed = JSON.parse(globalData);
+              if (parsed && typeof parsed === 'object') {
+                set({
+                  hardware: parsed.hardware || DEFAULT_HARDWARE,
+                  connectivity: parsed.connectivity || DEFAULT_CONNECTIVITY,
+                  licensing: parsed.licensing || DEFAULT_LICENSING,
+                  factors: parsed.factors || DEFAULT_FACTORS,
+                  scales: parsed.scales || DEFAULT_SCALES
+                });
+                console.log('Config loaded from global storage');
+                return true;
+              }
+            }
+          } catch (error) {
+            console.warn('Error loading from global storage:', error);
+          }
+        }
+        return false;
       },
 
       loadFromAPI: async () => {
         try {
+          console.log('Loading config from API...');
+          
+          // First, try to load from global storage
+          const globalLoaded = get().loadFromGlobalStorage();
+          if (globalLoaded) {
+            console.log('Using global storage data');
+            return;
+          }
+          
           // Try to load from API, but fall back to defaults if it fails
           const [hardwareRes, connectivityRes, licensingRes, factorsRes, scalesRes] = await Promise.allSettled([
             fetch('/api/config/hardware'),
@@ -189,25 +256,78 @@ export const useConfigStore = create<ConfigState>()(
             fetch('/api/config/scales')
           ]);
 
-          const hardware = hardwareRes.status === 'fulfilled' && hardwareRes.value.ok 
-            ? await hardwareRes.value.json() 
-            : DEFAULT_HARDWARE;
+          console.log('API responses:', {
+            hardware: hardwareRes.status,
+            connectivity: connectivityRes.status,
+            licensing: licensingRes.status,
+            factors: factorsRes.status,
+            scales: scalesRes.status
+          });
+
+          let hardware = DEFAULT_HARDWARE;
+          let connectivity = DEFAULT_CONNECTIVITY;
+          let licensing = DEFAULT_LICENSING;
+          let factors = DEFAULT_FACTORS;
+          let scales = DEFAULT_SCALES;
+
+          // Only use API data if it's valid and has the expected structure
+          if (hardwareRes.status === 'fulfilled' && hardwareRes.value.ok) {
+            try {
+              const apiHardware = await hardwareRes.value.json();
+              if (Array.isArray(apiHardware) && apiHardware.length > 0) {
+                hardware = apiHardware;
+              }
+            } catch (e) {
+              console.warn('Invalid hardware data from API, using defaults');
+            }
+          }
           
-          const connectivity = connectivityRes.status === 'fulfilled' && connectivityRes.value.ok 
-            ? await connectivityRes.value.json() 
-            : DEFAULT_CONNECTIVITY;
+          if (connectivityRes.status === 'fulfilled' && connectivityRes.value.ok) {
+            try {
+              const apiConnectivity = await connectivityRes.value.json();
+              if (Array.isArray(apiConnectivity) && apiConnectivity.length > 0) {
+                connectivity = apiConnectivity;
+              }
+            } catch (e) {
+              console.warn('Invalid connectivity data from API, using defaults');
+            }
+          }
           
-          const licensing = licensingRes.status === 'fulfilled' && licensingRes.value.ok 
-            ? await licensingRes.value.json() 
-            : DEFAULT_LICENSING;
+          if (licensingRes.status === 'fulfilled' && licensingRes.value.ok) {
+            try {
+              const apiLicensing = await licensingRes.value.json();
+              if (Array.isArray(apiLicensing) && apiLicensing.length > 0) {
+                licensing = apiLicensing;
+              }
+            } catch (e) {
+              console.warn('Invalid licensing data from API, using defaults');
+            }
+          }
           
-          const factors = factorsRes.status === 'fulfilled' && factorsRes.value.ok 
-            ? await factorsRes.value.json() 
-            : DEFAULT_FACTORS;
+          if (factorsRes.status === 'fulfilled' && factorsRes.value.ok) {
+            try {
+              const apiFactors = await factorsRes.value.json();
+              if (apiFactors && typeof apiFactors === 'object') {
+                factors = apiFactors;
+              }
+            } catch (e) {
+              console.warn('Invalid factors data from API, using defaults');
+            }
+          }
           
-          const scales = scalesRes.status === 'fulfilled' && scalesRes.value.ok 
-            ? await scalesRes.value.json() 
-            : DEFAULT_SCALES;
+          if (scalesRes.status === 'fulfilled' && scalesRes.value.ok) {
+            try {
+              const apiScales = await scalesRes.value.json();
+              if (apiScales && typeof apiScales === 'object' && apiScales.additional_costs) {
+                scales = apiScales;
+              }
+            } catch (e) {
+              console.warn('Invalid scales data from API, using defaults');
+            }
+          }
+
+          console.log('Final scales to be set:', scales);
+          console.log('Scales additional_costs:', scales?.additional_costs);
 
           set({
             hardware,
@@ -216,9 +336,21 @@ export const useConfigStore = create<ConfigState>()(
             factors,
             scales
           });
+          
+          // Sync the loaded data to global storage
+          get().syncToGlobalStorage();
+          
+          console.log('Config store updated successfully');
         } catch (error) {
           console.error('Error loading config from API:', error);
-          // Keep current state if API fails
+          // Set defaults if API fails
+          set({
+            hardware: DEFAULT_HARDWARE,
+            connectivity: DEFAULT_CONNECTIVITY,
+            licensing: DEFAULT_LICENSING,
+            factors: DEFAULT_FACTORS,
+            scales: DEFAULT_SCALES
+          });
         }
       },
     }),
