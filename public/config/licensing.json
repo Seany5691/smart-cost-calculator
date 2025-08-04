@@ -1,0 +1,38 @@
+[
+  {
+    "id": "lic1",
+    "name": "Premium License",
+    "cost": 90,
+    "managerCost": 90,
+    "userCost": 90,
+    "quantity": 0,
+    "locked": false
+  },
+  {
+    "id": "lic2",
+    "name": "Service Level Agreement (0 - 5 users)",
+    "cost": 299,
+    "managerCost": 299,
+    "userCost": 299,
+    "quantity": 0,
+    "locked": false
+  },
+  {
+    "id": "lic3",
+    "name": "Service Level Agreement (6 - 10 users)",
+    "cost": 399,
+    "managerCost": 399,
+    "userCost": 399,
+    "quantity": 0,
+    "locked": false
+  },
+  {
+    "id": "lic4",
+    "name": "Service Level Agreement (11 users or more)",
+    "cost": 499,
+    "managerCost": 499,
+    "userCost": 499,
+    "quantity": 0,
+    "locked": false
+  }
+] 

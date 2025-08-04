@@ -1,0 +1,29 @@
+[
+  {
+    "id": "conn1",
+    "name": "LTE",
+    "cost": 599,
+    "managerCost": 599,
+    "userCost": 599,
+    "quantity": 0,
+    "locked": false
+  },
+  {
+    "id": "conn2",
+    "name": "Fibre",
+    "cost": 599,
+    "managerCost": 599,
+    "userCost": 599,
+    "quantity": 0,
+    "locked": false
+  },
+  {
+    "id": "conn3",
+    "name": "Melon Sim Card",
+    "cost": 350,
+    "managerCost": 350,
+    "userCost": 350,
+    "quantity": 0,
+    "locked": false
+  }
+] 

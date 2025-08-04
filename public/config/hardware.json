@@ -1,0 +1,232 @@
+[
+  {
+    "id": "hw1",
+    "name": "Desk Phone B&W",
+    "cost": 1055,
+    "managerCost": 1055,
+    "userCost": 1055,
+    "quantity": 0,
+    "locked": false,
+    "isExtension": true
+  },
+  {
+    "id": "hw2",
+    "name": "Desk Phone Colour",
+    "cost": 1378,
+    "managerCost": 1378,
+    "userCost": 1378,
+    "quantity": 0,
+    "locked": false,
+    "isExtension": true
+  },
+  {
+    "id": "hw3",
+    "name": "Switchboard Colour",
+    "cost": 2207,
+    "managerCost": 2207,
+    "userCost": 2207,
+    "quantity": 0,
+    "locked": false,
+    "isExtension": true
+  },
+  {
+    "id": "hw4",
+    "name": "Cordless Phone",
+    "cost": 2420,
+    "managerCost": 2420,
+    "userCost": 2420,
+    "quantity": 0,
+    "locked": false,
+    "isExtension": true
+  },
+  {
+    "id": "hw5",
+    "name": "Bluetooth Headset Mono",
+    "cost": 1996,
+    "managerCost": 1996,
+    "userCost": 1996,
+    "quantity": 0,
+    "locked": false,
+    "isExtension": false
+  },
+  {
+    "id": "hw6",
+    "name": "Bluetooth Headset Dual",
+    "cost": 2340,
+    "managerCost": 2340,
+    "userCost": 2340,
+    "quantity": 0,
+    "locked": false,
+    "isExtension": false
+  },
+  {
+    "id": "hw7",
+    "name": "Corded Headset Dual",
+    "cost": 1467,
+    "managerCost": 1467,
+    "userCost": 1467,
+    "quantity": 0,
+    "locked": false,
+    "isExtension": false
+  },
+  {
+    "id": "hw8",
+    "name": "Cellphone",
+    "cost": 7500,
+    "managerCost": 7500,
+    "userCost": 7500,
+    "quantity": 0,
+    "locked": false,
+    "isExtension": false
+  },
+  {
+    "id": "hw9",
+    "name": "4 Port PoE",
+    "cost": 644,
+    "managerCost": 644,
+    "userCost": 644,
+    "quantity": 0,
+    "locked": false,
+    "isExtension": false
+  },
+  {
+    "id": "hw10",
+    "name": "8 Port PoE",
+    "cost": 813,
+    "managerCost": 813,
+    "userCost": 813,
+    "quantity": 0,
+    "locked": false,
+    "isExtension": false
+  },
+  {
+    "id": "hw11",
+    "name": "16 Port PoE",
+    "cost": 2282,
+    "managerCost": 2282,
+    "userCost": 2282,
+    "quantity": 0,
+    "locked": false,
+    "isExtension": false
+  },
+  {
+    "id": "hw12",
+    "name": "8 Port Managed PoE",
+    "cost": 1657,
+    "managerCost": 1657,
+    "userCost": 1657,
+    "quantity": 0,
+    "locked": false,
+    "isExtension": false
+  },
+  {
+    "id": "hw13",
+    "name": "16 Port Managed PoE",
+    "cost": 2994,
+    "managerCost": 2994,
+    "userCost": 2994,
+    "quantity": 0,
+    "locked": false,
+    "isExtension": false
+  },
+  {
+    "id": "hw14",
+    "name": "Access Point Gigabit",
+    "cost": 1350,
+    "managerCost": 1350,
+    "userCost": 1350,
+    "quantity": 0,
+    "locked": false,
+    "isExtension": false
+  },
+  {
+    "id": "hw15",
+    "name": "Cloud Router WAN2",
+    "cost": 1613,
+    "managerCost": 1613,
+    "userCost": 1613,
+    "quantity": 0,
+    "locked": false,
+    "isExtension": false
+  },
+  {
+    "id": "hw16",
+    "name": "5G/LTE Router",
+    "cost": 1800,
+    "managerCost": 1800,
+    "userCost": 1800,
+    "quantity": 0,
+    "locked": false,
+    "isExtension": false
+  },
+  {
+    "id": "hw17",
+    "name": "PC",
+    "cost": 9000,
+    "managerCost": 9000,
+    "userCost": 9000,
+    "quantity": 0,
+    "locked": false,
+    "isExtension": false
+  },
+  {
+    "id": "hw18",
+    "name": "A4 Copier",
+    "cost": 17000,
+    "managerCost": 17000,
+    "userCost": 17000,
+    "quantity": 0,
+    "locked": false,
+    "isExtension": false
+  },
+  {
+    "id": "hw19",
+    "name": "Server Cabinet",
+    "cost": 1466.25,
+    "managerCost": 1466.25,
+    "userCost": 1466.25,
+    "quantity": 0,
+    "locked": false,
+    "isExtension": false
+  },
+  {
+    "id": "hw20",
+    "name": "Additional Mobile App",
+    "cost": 0,
+    "managerCost": 0,
+    "userCost": 0,
+    "quantity": 0,
+    "locked": false,
+    "isExtension": true
+  },
+  {
+    "id": "hw21",
+    "name": "Additional App on Own Device",
+    "cost": 0,
+    "managerCost": 0,
+    "userCost": 0,
+    "quantity": 0,
+    "locked": false,
+    "isExtension": false
+  },
+  {
+    "id": "hw22",
+    "name": "Number Porting Per Number",
+    "cost": 200,
+    "managerCost": 200,
+    "userCost": 200,
+    "quantity": 0,
+    "locked": false,
+    "isExtension": false
+  },
+  {
+    "id": "id_1754299078389_6fxqwj5dy",
+    "name": "Test Item",
+    "cost": 1.99,
+    "managerCost": 0,
+    "userCost": 0,
+    "quantity": 0,
+    "locked": false,
+    "isExtension": true
+  }
+]
