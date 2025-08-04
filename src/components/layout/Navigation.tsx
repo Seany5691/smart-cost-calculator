@@ -33,7 +33,6 @@ export default function Navigation() {
     { name: 'Documentation', href: '/documentation', icon: FileText },
     ...(user?.role === 'admin' ? [
       { name: 'Admin', href: '/admin', icon: Settings },
-      { name: 'User Management', href: '/admin/users', icon: Users },
     ] : []),
   ];
 

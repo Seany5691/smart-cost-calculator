@@ -1,12 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useCalculatorStore } from '@/store/calculator';
+import { useConfigStore } from '@/store/config';
 import { Scales } from '@/lib/types';
 import { Save } from 'lucide-react';
 
 export default function ScalesConfig() {
-  const { scales, updateScales } = useCalculatorStore();
+  const { scales, updateScales } = useConfigStore();
   const [scalesData, setScalesData] = useState<Scales>({
     installation: {},
     finance_fee: {},
@@ -25,12 +25,8 @@ export default function ScalesConfig() {
     setMessage(null);
 
     try {
-      const success = await updateScales(scalesData);
-      if (success) {
-        setMessage({ type: 'success', text: 'Scales configuration saved successfully!' });
-      } else {
-        setMessage({ type: 'error', text: 'Failed to save scales configuration.' });
-      }
+      updateScales(scalesData);
+      setMessage({ type: 'success', text: 'Scales configuration saved successfully!' });
     } catch (error) {
       setMessage({ type: 'error', text: 'An error occurred while saving.' });
     } finally {

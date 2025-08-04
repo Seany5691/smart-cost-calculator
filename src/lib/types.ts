@@ -89,17 +89,10 @@ export interface AuthState {
 export interface CalculatorState {
   sections: Section[];
   dealDetails: DealDetails;
-  factors: FactorData;
-  scales: Scales;
   initializeStore: () => Promise<void>;
   updateSectionItem: (sectionId: string, itemId: string, updates: Partial<Item>) => void;
   addTemporaryItem: (sectionId: string, item: Item) => void;
   updateDealDetails: (updates: Partial<DealDetails>) => void;
-  updateFactors: (factors: FactorData) => Promise<boolean>;
-  updateScales: (scales: Scales) => Promise<boolean>;
-  updateHardware: (items: Item[]) => Promise<boolean>;
-  updateLicensing: (items: Item[]) => Promise<boolean>;
-  updateConnectivity: (items: Item[]) => Promise<boolean>;
   saveDeal: () => Promise<boolean>;
   calculateTotalCosts: () => TotalCosts;
 }

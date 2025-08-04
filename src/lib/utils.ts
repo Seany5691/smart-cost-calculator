@@ -137,7 +137,7 @@ export const getDistanceBandCost = (
 };
 
 export const getItemCost = (
-  item: Record<string, unknown>,
+  item: Item,
   userRole: 'admin' | 'manager' | 'user' = 'user'
 ): number => {
   if (userRole === 'manager' && item.managerCost !== undefined) {

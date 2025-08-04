@@ -1,37 +1,29 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useCalculatorStore } from '@/store/calculator';
+import { useConfigStore } from '@/store/config';
 import { Item } from '@/lib/types';
 import { formatCurrency, generateId } from '@/lib/utils';
 import { Plus, Trash2, Edit, Save, X, Check } from 'lucide-react';
 
 export default function LicensingConfig() {
-  const { sections, updateLicensing } = useCalculatorStore();
+  const { licensing, updateLicensing } = useConfigStore();
   const [items, setItems] = useState<Item[]>([]);
   const [editingItem, setEditingItem] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  const licensingSection = sections.find(s => s.id === 'licensing');
-
   useEffect(() => {
-    if (licensingSection) {
-      setItems(licensingSection.items);
-    }
-  }, [licensingSection]);
+    setItems(licensing);
+  }, [licensing]);
 
   const handleSave = async () => {
     setIsLoading(true);
     setMessage(null);
 
     try {
-      const success = await updateLicensing(items);
-      if (success) {
-        setMessage({ type: 'success', text: 'Licensing configuration saved successfully!' });
-      } else {
-        setMessage({ type: 'error', text: 'Failed to save licensing configuration.' });
-      }
+      updateLicensing(items);
+      setMessage({ type: 'success', text: 'Licensing configuration saved successfully!' });
     } catch (error) {
       setMessage({ type: 'error', text: 'An error occurred while saving.' });
     } finally {

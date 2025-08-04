@@ -1,12 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useCalculatorStore } from '@/store/calculator';
+import { useConfigStore } from '@/store/config';
 import { FactorData } from '@/lib/types';
 import { Save } from 'lucide-react';
 
 export default function FactorSheetConfig() {
-  const { factors, updateFactors } = useCalculatorStore();
+  const { factors, updateFactors } = useConfigStore();
   const [factorData, setFactorData] = useState<FactorData>({});
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -20,12 +20,8 @@ export default function FactorSheetConfig() {
     setMessage(null);
 
     try {
-      const success = await updateFactors(factorData);
-      if (success) {
-        setMessage({ type: 'success', text: 'Factor sheet saved successfully!' });
-      } else {
-        setMessage({ type: 'error', text: 'Failed to save factor sheet.' });
-      }
+      updateFactors(factorData);
+      setMessage({ type: 'success', text: 'Factor sheet saved successfully!' });
     } catch (error) {
       setMessage({ type: 'error', text: 'An error occurred while saving.' });
     } finally {

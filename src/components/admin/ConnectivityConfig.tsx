@@ -1,37 +1,29 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useCalculatorStore } from '@/store/calculator';
+import { useConfigStore } from '@/store/config';
 import { Item } from '@/lib/types';
 import { formatCurrency, generateId } from '@/lib/utils';
 import { Plus, Trash2, Edit, Save, X, Check } from 'lucide-react';
 
 export default function ConnectivityConfig() {
-  const { sections, updateConnectivity } = useCalculatorStore();
+  const { connectivity, updateConnectivity } = useConfigStore();
   const [items, setItems] = useState<Item[]>([]);
   const [editingItem, setEditingItem] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  const connectivitySection = sections.find(s => s.id === 'connectivity');
-
   useEffect(() => {
-    if (connectivitySection) {
-      setItems(connectivitySection.items);
-    }
-  }, [connectivitySection]);
+    setItems(connectivity);
+  }, [connectivity]);
 
   const handleSave = async () => {
     setIsLoading(true);
     setMessage(null);
 
     try {
-      const success = await updateConnectivity(items);
-      if (success) {
-        setMessage({ type: 'success', text: 'Connectivity configuration saved successfully!' });
-      } else {
-        setMessage({ type: 'error', text: 'Failed to save connectivity configuration.' });
-      }
+      updateConnectivity(items);
+      setMessage({ type: 'success', text: 'Connectivity configuration saved successfully!' });
     } catch (error) {
       setMessage({ type: 'error', text: 'An error occurred while saving.' });
     } finally {
