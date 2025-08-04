@@ -23,9 +23,12 @@ export const useCalculatorStore = create<CalculatorState>()(
         console.log('Initializing calculator store...');
         const configStore = useConfigStore.getState();
         
-        // Ensure config store is loaded
-        if (!configStore.scales || !configStore.factors) {
-          console.log('Config store not initialized, loading from API...');
+        // Ensure config store is loaded with comprehensive checks
+        if (!configStore.scales || !configStore.factors || 
+            !configStore.scales.additional_costs || 
+            typeof configStore.scales.additional_costs.cost_per_kilometer === 'undefined' ||
+            typeof configStore.scales.additional_costs.cost_per_point === 'undefined') {
+          console.log('Config store not fully initialized, loading from API...');
           await configStore.loadFromAPI();
         }
         
@@ -36,6 +39,13 @@ export const useCalculatorStore = create<CalculatorState>()(
           hasFactors: !!freshConfigStore.factors,
           additionalCosts: freshConfigStore.scales?.additional_costs
         });
+        
+        // Final check to ensure we have all required data
+        if (!freshConfigStore.scales?.additional_costs?.cost_per_kilometer || 
+            !freshConfigStore.scales?.additional_costs?.cost_per_point) {
+          console.error('Config store still missing required data after loading');
+          return;
+        }
         
         const sections = [
           { id: 'hardware', name: 'Hardware', items: freshConfigStore.hardware },
@@ -137,9 +147,12 @@ export const useCalculatorStore = create<CalculatorState>()(
           additionalCosts: configStore.scales?.additional_costs
         });
         
-        // Ensure config store is available
-        if (!configStore.scales || !configStore.factors) {
-          console.warn('Config store not initialized, using default values');
+        // Ensure config store is available with comprehensive checks
+        if (!configStore.scales || !configStore.factors || 
+            !configStore.scales.additional_costs || 
+            typeof configStore.scales.additional_costs.cost_per_kilometer === 'undefined' ||
+            typeof configStore.scales.additional_costs.cost_per_point === 'undefined') {
+          console.warn('Config store not fully initialized, using default values');
           return {
             extensionCount: 0,
             hardwareTotal: 0,

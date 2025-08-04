@@ -14,6 +14,8 @@ import TotalCostsSection from '@/components/calculator/TotalCostsSection';
 
 export default function CalculatorPage() {
   const [tabIndex, setTabIndex] = useState(0);
+  const [isInitializing, setIsInitializing] = useState(true);
+  const [initError, setInitError] = useState<string | null>(null);
   const { isAuthenticated } = useAuthStore();
   const { initializeStore } = useCalculatorStore();
   const router = useRouter();
@@ -25,13 +27,85 @@ export default function CalculatorPage() {
     }
     
     const init = async () => {
-      await initializeStore();
+      setIsInitializing(true);
+      setInitError(null);
+      
+      try {
+        // Try to initialize with retries
+        let retries = 0;
+        const maxRetries = 3;
+        
+        while (retries < maxRetries) {
+          try {
+            await initializeStore();
+            
+            // Verify config store is properly loaded
+            const { useConfigStore } = await import('@/store/config');
+            const configStore = useConfigStore.getState();
+            
+            if (configStore.scales?.additional_costs?.cost_per_kilometer && 
+                configStore.scales?.additional_costs?.cost_per_point) {
+              console.log('Calculator initialized successfully');
+              setIsInitializing(false);
+              return;
+            } else {
+              console.log(`Retry ${retries + 1}: Config store not ready, retrying...`);
+              retries++;
+              await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+            }
+          } catch (error) {
+            console.error(`Retry ${retries + 1} failed:`, error);
+            retries++;
+            if (retries >= maxRetries) {
+              throw error;
+            }
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+        }
+        
+        throw new Error('Failed to initialize calculator after multiple retries');
+      } catch (error) {
+        console.error('Failed to initialize calculator:', error);
+        setInitError('Failed to initialize calculator. Please refresh the page.');
+        setIsInitializing(false);
+      }
     };
+    
     init();
   }, [isAuthenticated, router, initializeStore]);
 
   if (!isAuthenticated) {
     return null;
+  }
+
+  if (isInitializing) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <h2 className="text-xl font-semibold text-gray-700 mb-2">Initializing Calculator...</h2>
+          <p className="text-gray-500">Please wait while we load the configuration data.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (initError) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto p-6">
+          <div className="text-red-500 text-4xl mb-4">⚠️</div>
+          <h2 className="text-xl font-semibold text-gray-700 mb-2">Initialization Error</h2>
+          <p className="text-gray-500 mb-4">{initError}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="btn btn-primary"
+          >
+            Refresh Page
+          </button>
+        </div>
+      </div>
+    );
   }
 
   const tabs = [
