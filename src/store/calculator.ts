@@ -21,6 +21,12 @@ export const useCalculatorStore = create<CalculatorState>()(
 
       initializeStore: async () => {
         const configStore = useConfigStore.getState();
+        
+        // Ensure config store is loaded
+        if (!configStore.scales || !configStore.factors) {
+          await configStore.loadFromAPI();
+        }
+        
         const sections = [
           { id: 'hardware', name: 'Hardware', items: configStore.hardware },
           { id: 'connectivity', name: 'Connectivity', items: configStore.connectivity },
@@ -110,6 +116,31 @@ export const useCalculatorStore = create<CalculatorState>()(
       calculateTotalCosts: (): TotalCosts => {
         const { sections, dealDetails } = get();
         const configStore = useConfigStore.getState();
+        
+        // Ensure config store is available
+        if (!configStore.scales || !configStore.factors) {
+          console.warn('Config store not initialized, using default values');
+          return {
+            extensionCount: 0,
+            hardwareTotal: 0,
+            hardwareInstallTotal: 0,
+            baseGrossProfit: 0,
+            additionalProfit: 0,
+            totalGrossProfit: 0,
+            financeFee: 0,
+            settlementAmount: 0,
+            financeAmount: 0,
+            totalPayout: 0,
+            hardwareRental: 0,
+            connectivityCost: 0,
+            licensingCost: 0,
+            totalMRC: 0,
+            totalExVat: 0,
+            totalIncVat: 0,
+            factorUsed: 0
+          };
+        }
+        
         const user = typeof window !== 'undefined' ? 
           JSON.parse(localStorage.getItem('auth-storage') || '{}')?.state?.user : null;
 
@@ -151,21 +182,25 @@ export const useCalculatorStore = create<CalculatorState>()(
 
         // Get installation cost based on extension count
         let installationCost = 0;
-        for (const [band, cost] of Object.entries(configStore.scales.installation)) {
-          const [min, max] = band.split('-').map(Number);
-          if (extensionCount >= (min || 0) && extensionCount <= (max || Infinity)) {
-            installationCost = cost;
-            break;
+        if (configStore.scales?.installation) {
+          for (const [band, cost] of Object.entries(configStore.scales.installation)) {
+            const [min, max] = band.split('-').map(Number);
+            if (extensionCount >= (min || 0) && extensionCount <= (max || Infinity)) {
+              installationCost = cost;
+              break;
+            }
           }
         }
 
         // Get gross profit based on extension count
         let baseGrossProfit = 0;
-        for (const [band, profit] of Object.entries(configStore.scales.gross_profit)) {
-          const [min, max] = band.split('-').map(Number);
-          if (extensionCount >= (min || 0) && extensionCount <= (max || Infinity)) {
-            baseGrossProfit = profit;
-            break;
+        if (configStore.scales?.gross_profit) {
+          for (const [band, profit] of Object.entries(configStore.scales.gross_profit)) {
+            const [min, max] = band.split('-').map(Number);
+            if (extensionCount >= (min || 0) && extensionCount <= (max || Infinity)) {
+              baseGrossProfit = profit;
+              break;
+            }
           }
         }
 
@@ -177,25 +212,27 @@ export const useCalculatorStore = create<CalculatorState>()(
         const licensingCost = licensingSection.items
           .reduce((sum, item) => sum + (getItemCost(item, user?.role || 'user') * item.quantity), 0);
 
-        // Calculate additional costs
-        const distanceCost = dealDetails.distanceToInstall * configStore.scales.additional_costs.cost_per_kilometer;
-        const pointCost = extensionCount * configStore.scales.additional_costs.cost_per_point;
-        const additionalCosts = distanceCost + pointCost;
+        // Calculate additional costs with null checks
+        const additionalCosts = configStore.scales?.additional_costs ? 
+          (dealDetails.distanceToInstall * configStore.scales.additional_costs.cost_per_kilometer) +
+          (extensionCount * configStore.scales.additional_costs.cost_per_point) : 0;
 
         // Calculate totals
         const additionalProfit = dealDetails.additionalGrossProfit;
         const totalGrossProfit = baseGrossProfit + additionalProfit;
         const settlementAmount = dealDetails.settlement;
-        const extensionCost = extensionCount * configStore.scales.additional_costs.cost_per_point;
+        const extensionCost = extensionCount * (configStore.scales?.additional_costs?.cost_per_point || 0);
         
         // Calculate finance fee based on hardware + installation (for fee calculation only)
         const feeCalculationAmount = hardwareTotal + installationCost;
         let financeFee = 0;
-        for (const [range, fee] of Object.entries(configStore.scales.finance_fee)) {
-          const [min, max] = range.split('-').map(Number);
-          if (feeCalculationAmount >= (min || 0) && feeCalculationAmount <= (max || Infinity)) {
-            financeFee = fee;
-            break;
+        if (configStore.scales?.finance_fee) {
+          for (const [range, fee] of Object.entries(configStore.scales.finance_fee)) {
+            const [min, max] = range.split('-').map(Number);
+            if (feeCalculationAmount >= (min || 0) && feeCalculationAmount <= (max || Infinity)) {
+              financeFee = fee;
+              break;
+            }
           }
         }
         
@@ -203,7 +240,7 @@ export const useCalculatorStore = create<CalculatorState>()(
         const financeAmount = hardwareTotal + extensionCost + installationCost + totalGrossProfit + financeFee + settlementAmount;
         
         // Get factor for financing (using the new finance amount)
-        const factorUsed = getFactorForDeal(configStore.factors, dealDetails.term, dealDetails.escalation, financeAmount);
+        const factorUsed = configStore.factors ? getFactorForDeal(configStore.factors, dealDetails.term, dealDetails.escalation, financeAmount) : 0;
         
         // Total payout equals finance amount
         const totalPayout = financeAmount;

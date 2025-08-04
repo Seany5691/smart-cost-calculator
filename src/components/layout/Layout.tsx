@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useOfflineStore } from '@/store/offline';
 import { useAuthStore } from '@/store/auth';
+import { useConfigStore } from '@/store/config';
 import Navigation from './Navigation';
 import OfflineAlert from './OfflineAlert';
 import PasswordChangeModal from '../auth/PasswordChangeModal';
@@ -14,6 +15,7 @@ interface LayoutProps {
 export default function Layout({ children }: LayoutProps) {
   const { setOnlineStatus } = useOfflineStore();
   const { user } = useAuthStore();
+  const { loadFromAPI } = useConfigStore();
   const [showPasswordModal, setShowPasswordModal] = useState(false);
 
   useEffect(() => {
@@ -31,6 +33,11 @@ export default function Layout({ children }: LayoutProps) {
       window.removeEventListener('offline', handleOffline);
     };
   }, [setOnlineStatus]);
+
+  // Initialize config store on app load
+  useEffect(() => {
+    loadFromAPI();
+  }, [loadFromAPI]);
 
   // Show password change modal if user requires password change
   useEffect(() => {
