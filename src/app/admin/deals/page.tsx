@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth';
-import { Calendar, User, DollarSign, ArrowRight, Users, FileText, ChevronRight } from 'lucide-react';
+import { Calculator, Calendar, User, DollarSign, ArrowRight, Plus, FileText, Users } from 'lucide-react';
 import Link from 'next/link';
 
 interface Deal {
@@ -35,49 +35,45 @@ interface UserDeals {
 export default function AdminDealsPage() {
   const [userDeals, setUserDeals] = useState<UserDeals[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [expandedUsers, setExpandedUsers] = useState<Set<string>>(new Set());
   const { user, checkAuth } = useAuthStore();
   const router = useRouter();
 
-  useEffect(() => {
-    if (!checkAuth() || user?.role !== 'admin') {
-      router.push('/login');
-      return;
-    }
-
-    loadAllDeals();
-  }, [user, checkAuth, router, loadAllDeals]);
-
-  const loadAllDeals = async () => {
+  const loadDeals = useCallback(async () => {
     try {
-      const response = await fetch(`/api/deals?userId=${user?.id}&userRole=${user?.role}`);
-      if (response.ok) {
-        const deals: Deal[] = await response.json();
-        
-        // Group deals by user
-        const groupedDeals = deals.reduce((acc: UserDeals[], deal) => {
-          const existingUser = acc.find(u => u.userId === deal.userId);
-          if (existingUser) {
-            existingUser.deals.push(deal);
-          } else {
-            acc.push({
-              userId: deal.userId,
-              username: deal.username,
-              userRole: deal.userRole,
-              deals: [deal]
-            });
-          }
-          return acc;
-        }, []);
-        
-        setUserDeals(groupedDeals);
-      }
+      // Load deals from localStorage instead of API
+      const allDeals: Deal[] = JSON.parse(localStorage.getItem('deals-storage') || '[]');
+      
+      // Group deals by user
+      const dealsByUser: { [key: string]: UserDeals } = {};
+      
+      allDeals.forEach((deal) => {
+        if (!dealsByUser[deal.userId]) {
+          dealsByUser[deal.userId] = {
+            userId: deal.userId,
+            username: deal.username,
+            userRole: deal.userRole,
+            deals: []
+          };
+        }
+        dealsByUser[deal.userId].deals.push(deal);
+      });
+      
+      setUserDeals(Object.values(dealsByUser));
     } catch (error) {
       console.error('Error loading deals:', error);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (!checkAuth() || user?.role !== 'admin') {
+      router.push('/');
+      return;
+    }
+
+    loadDeals();
+  }, [checkAuth, router, loadDeals, user?.role]);
 
   const toggleUserExpanded = (userId: string) => {
     const newExpanded = new Set(expandedUsers);

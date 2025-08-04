@@ -95,13 +95,12 @@ export const useCalculatorStore = create<CalculatorState>()(
             updatedAt: new Date().toISOString()
           };
 
-          const response = await fetch('/api/deals', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(deal)
-          });
+          // Store deal in localStorage instead of API call
+          const existingDeals = JSON.parse(localStorage.getItem('deals-storage') || '[]');
+          existingDeals.push(deal);
+          localStorage.setItem('deals-storage', JSON.stringify(existingDeals));
 
-          return response.ok;
+          return true;
         } catch (error) {
           console.error('Error saving deal:', error);
           return false;

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth';
 import { Calculator, Calendar, User, DollarSign, ArrowRight, Plus, FileText } from 'lucide-react';
@@ -31,6 +31,29 @@ export default function DealsPage() {
   const { user, checkAuth } = useAuthStore();
   const router = useRouter();
 
+  const loadDeals = useCallback(async () => {
+    try {
+      // Load deals from localStorage instead of API
+      const allDeals = JSON.parse(localStorage.getItem('deals-storage') || '[]');
+      
+      // Filter deals based on user role
+      let userDeals: Deal[] = [];
+      if (user?.role === 'admin') {
+        // Admin can see all deals
+        userDeals = allDeals;
+      } else {
+        // User/Manager can only see their own deals
+        userDeals = allDeals.filter((deal: Deal) => deal.userId === user?.id);
+      }
+      
+      setDeals(userDeals);
+    } catch (error) {
+      console.error('Error loading deals:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user?.id, user?.role]);
+
   useEffect(() => {
     if (!checkAuth()) {
       router.push('/login');
@@ -39,20 +62,6 @@ export default function DealsPage() {
 
     loadDeals();
   }, [checkAuth, router, loadDeals]);
-
-  const loadDeals = async () => {
-    try {
-      const response = await fetch(`/api/deals?userId=${user?.id}&userRole=${user?.role}`);
-      if (response.ok) {
-        const data = await response.json();
-        setDeals(data);
-      }
-    } catch (error) {
-      console.error('Error loading deals:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-GB', {
