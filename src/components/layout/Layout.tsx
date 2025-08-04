@@ -43,11 +43,11 @@ export default function Layout({ children }: LayoutProps) {
 
   // Set up periodic sync and storage event listener
   useEffect(() => {
-    // Sync every 30 seconds to ensure data consistency
+    // Sync every 60 seconds to ensure data consistency (reduced frequency)
     const syncInterval = setInterval(() => {
       const configStore = useConfigStore.getState();
       configStore.loadFromGlobalStorage();
-    }, 30000);
+    }, 60000);
 
     // Listen for storage changes from other tabs
     const handleStorageChange = (e: StorageEvent) => {

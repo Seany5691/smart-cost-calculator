@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useCalculatorStore } from '@/store/calculator';
 import { useAuthStore } from '@/store/auth';
+import { useConfigStore } from '@/store/config';
 import { formatCurrency } from '@/lib/utils';
 import { FileText, CheckCircle, AlertCircle } from 'lucide-react';
 
@@ -14,8 +15,9 @@ interface PDFGeneratorProps {
 }
 
 export default function PDFGenerator({ onGenerate }: PDFGeneratorProps) {
-  const { sections, dealDetails, calculateTotalCosts, scales } = useCalculatorStore();
+  const { sections, dealDetails, calculateTotalCosts } = useCalculatorStore();
   const { user } = useAuthStore();
+  const { scales } = useConfigStore();
   const [isGenerating, setIsGenerating] = useState(false);
   const [toast, setToast] = useState<{ show: boolean; title: string; message: string; type: 'success' | 'error' }>({ 
     show: false, 

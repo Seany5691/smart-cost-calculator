@@ -45,6 +45,33 @@ const SAMPLE_USERS: User[] = [
 // Global storage key for cross-browser user synchronization
 const GLOBAL_USERS_KEY = 'smart-cost-calculator-global-users';
 
+// Enhanced validation function for user data
+const validateUserData = (data: any): boolean => {
+  if (!data || typeof data !== 'object') return false;
+  
+  // Check if users array exists and is valid
+  if (!data.users || !Array.isArray(data.users)) return false;
+  
+  // Validate each user object
+  for (const user of data.users) {
+    if (!user || typeof user !== 'object') return false;
+    
+    // Check required user properties
+    const requiredProps = ['id', 'username', 'password', 'role', 'name', 'email', 'isActive'];
+    for (const prop of requiredProps) {
+      if (!user.hasOwnProperty(prop)) return false;
+    }
+    
+    // Validate role
+    if (!['admin', 'manager', 'user'].includes(user.role)) return false;
+    
+    // Validate email format (basic check)
+    if (typeof user.email !== 'string' || !user.email.includes('@')) return false;
+  }
+  
+  return true;
+};
+
 export const useAuthStore = create<AuthState>()(
   persist(
     (set, get) => ({
@@ -127,13 +154,24 @@ export const useAuthStore = create<AuthState>()(
 
       syncUsersToGlobalStorage: () => {
         if (typeof window !== 'undefined') {
-          const state = get();
-          const globalData = {
-            users: state.users,
-            lastUpdated: new Date().toISOString()
-          };
-          localStorage.setItem(GLOBAL_USERS_KEY, JSON.stringify(globalData));
-          console.log('Users synced to global storage');
+          try {
+            const state = get();
+            const globalData = {
+              users: state.users,
+              lastUpdated: new Date().toISOString(),
+              version: '1.0'
+            };
+            
+            // Validate data before saving
+            if (validateUserData(globalData)) {
+              localStorage.setItem(GLOBAL_USERS_KEY, JSON.stringify(globalData));
+              console.log('Users synced to global storage successfully');
+            } else {
+              console.error('Invalid user data, not syncing to global storage');
+            }
+          } catch (error) {
+            console.error('Error syncing users to global storage:', error);
+          }
         }
       },
 
@@ -143,14 +181,19 @@ export const useAuthStore = create<AuthState>()(
             const globalData = localStorage.getItem(GLOBAL_USERS_KEY);
             if (globalData) {
               const parsed = JSON.parse(globalData);
-              if (parsed && parsed.users && Array.isArray(parsed.users)) {
+              
+              // Validate the loaded data
+              if (validateUserData(parsed)) {
                 set({ users: parsed.users });
-                console.log('Users loaded from global storage');
+                console.log('Users loaded from global storage successfully');
                 return true;
+              } else {
+                console.warn('Invalid user data in global storage, using defaults');
+                return false;
               }
             }
           } catch (error) {
-            console.warn('Error loading users from global storage:', error);
+            console.error('Error loading users from global storage:', error);
           }
         }
         return false;

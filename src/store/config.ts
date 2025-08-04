@@ -156,6 +156,31 @@ const DEFAULT_SCALES: Scales = {
 // Global storage key for cross-browser synchronization
 const GLOBAL_CONFIG_KEY = 'smart-cost-calculator-global-config';
 
+// Enhanced validation function
+const validateConfigData = (data: any): boolean => {
+  if (!data || typeof data !== 'object') return false;
+  
+  // Check if all required properties exist
+  const requiredProps = ['hardware', 'connectivity', 'licensing', 'factors', 'scales'];
+  for (const prop of requiredProps) {
+    if (!data[prop]) return false;
+  }
+  
+  // Validate scales structure
+  if (!data.scales.additional_costs || 
+      typeof data.scales.additional_costs.cost_per_kilometer !== 'number' ||
+      typeof data.scales.additional_costs.cost_per_point !== 'number') {
+    return false;
+  }
+  
+  // Validate arrays
+  if (!Array.isArray(data.hardware) || !Array.isArray(data.connectivity) || !Array.isArray(data.licensing)) {
+    return false;
+  }
+  
+  return true;
+};
+
 export const useConfigStore = create<ConfigState>()(
   persist(
     (set, get) => ({
@@ -197,17 +222,28 @@ export const useConfigStore = create<ConfigState>()(
 
       syncToGlobalStorage: () => {
         if (typeof window !== 'undefined') {
-          const state = get();
-          const globalData = {
-            hardware: state.hardware,
-            connectivity: state.connectivity,
-            licensing: state.licensing,
-            factors: state.factors,
-            scales: state.scales,
-            lastUpdated: new Date().toISOString()
-          };
-          localStorage.setItem(GLOBAL_CONFIG_KEY, JSON.stringify(globalData));
-          console.log('Config synced to global storage');
+          try {
+            const state = get();
+            const globalData = {
+              hardware: state.hardware,
+              connectivity: state.connectivity,
+              licensing: state.licensing,
+              factors: state.factors,
+              scales: state.scales,
+              lastUpdated: new Date().toISOString(),
+              version: '1.0'
+            };
+            
+            // Validate data before saving
+            if (validateConfigData(globalData)) {
+              localStorage.setItem(GLOBAL_CONFIG_KEY, JSON.stringify(globalData));
+              console.log('Config synced to global storage successfully');
+            } else {
+              console.error('Invalid config data, not syncing to global storage');
+            }
+          } catch (error) {
+            console.error('Error syncing to global storage:', error);
+          }
         }
       },
 
@@ -217,7 +253,9 @@ export const useConfigStore = create<ConfigState>()(
             const globalData = localStorage.getItem(GLOBAL_CONFIG_KEY);
             if (globalData) {
               const parsed = JSON.parse(globalData);
-              if (parsed && typeof parsed === 'object') {
+              
+              // Validate the loaded data
+              if (validateConfigData(parsed)) {
                 set({
                   hardware: parsed.hardware || DEFAULT_HARDWARE,
                   connectivity: parsed.connectivity || DEFAULT_CONNECTIVITY,
@@ -225,12 +263,15 @@ export const useConfigStore = create<ConfigState>()(
                   factors: parsed.factors || DEFAULT_FACTORS,
                   scales: parsed.scales || DEFAULT_SCALES
                 });
-                console.log('Config loaded from global storage');
+                console.log('Config loaded from global storage successfully');
                 return true;
+              } else {
+                console.warn('Invalid config data in global storage, using defaults');
+                return false;
               }
             }
           } catch (error) {
-            console.warn('Error loading from global storage:', error);
+            console.error('Error loading from global storage:', error);
           }
         }
         return false;

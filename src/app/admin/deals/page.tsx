@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth';
-import { Calculator, Calendar, User, DollarSign, ArrowRight, Plus, FileText, Users } from 'lucide-react';
+import { Calculator, Calendar, User, DollarSign, ArrowRight, Plus, FileText, Users, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 
 interface Deal {
