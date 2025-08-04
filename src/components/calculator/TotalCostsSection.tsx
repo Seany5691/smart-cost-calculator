@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useCalculatorStore } from '@/store/calculator';
 import { useAuthStore } from '@/store/auth';
+import { useConfigStore } from '@/store/config';
 import { formatCurrency } from '@/lib/utils';
 import { TotalCosts } from '@/lib/types';
 import { ChevronLeft, Download, FileText, Printer } from 'lucide-react';
@@ -13,8 +14,9 @@ interface TotalCostsSectionProps {
 }
 
 export default function TotalCostsSection({ onPrev }: TotalCostsSectionProps) {
-  const { calculateTotalCosts, dealDetails, scales, saveDeal } = useCalculatorStore();
+  const { calculateTotalCosts, dealDetails, saveDeal } = useCalculatorStore();
   const { user } = useAuthStore();
+  const { scales } = useConfigStore();
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [totals, setTotals] = useState<TotalCosts>({
@@ -102,8 +104,8 @@ export default function TotalCostsSection({ onPrev }: TotalCostsSectionProps) {
                   <td className="py-2 text-sm text-gray-900 text-right font-medium">{formatCurrency(totals.hardwareTotal)}</td>
                 </tr>
                 <tr>
-                  <td className="py-2 text-sm text-gray-600">Extension Cost ({totals.extensionCount} × {formatCurrency(scales.additional_costs.cost_per_point)})</td>
-                  <td className="py-2 text-sm text-gray-900 text-right font-medium">{formatCurrency(totals.extensionCount * scales.additional_costs.cost_per_point)}</td>
+                  <td className="py-2 text-sm text-gray-600">Extension Cost ({totals.extensionCount} × {formatCurrency(scales?.additional_costs?.cost_per_point || 0)})</td>
+                  <td className="py-2 text-sm text-gray-900 text-right font-medium">{formatCurrency(totals.extensionCount * (scales?.additional_costs?.cost_per_point || 0))}</td>
                 </tr>
                 <tr>
                   <td className="py-2 text-sm text-gray-600">Installation Cost</td>
