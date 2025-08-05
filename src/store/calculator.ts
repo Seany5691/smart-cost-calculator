@@ -171,8 +171,13 @@ export const useCalculatorStore = create<CalculatorState>()(
           };
         }
         
+        // Get user role from localStorage (auth store is not available in this context)
         const user = typeof window !== 'undefined' ? 
           JSON.parse(localStorage.getItem('auth-storage') || '{}')?.state?.user : null;
+        const userRole: 'admin' | 'manager' | 'user' = user?.role || 'user';
+        
+        // Debug logging for role-based pricing
+        console.log('User role for pricing:', userRole);
 
         // Get hardware section
         const hardwareSection = sections.find(s => s.id === 'hardware');
@@ -206,7 +211,7 @@ export const useCalculatorStore = create<CalculatorState>()(
 
         // Calculate hardware total
         const hardwareTotal = hardwareSection.items
-          .reduce((sum, item) => sum + (getItemCost(item, user?.role || 'user') * item.quantity), 0);
+          .reduce((sum, item) => sum + (getItemCost(item, userRole) * item.quantity), 0);
 
         // Get installation cost based on extension count
         let installationCost = 0;
@@ -234,11 +239,11 @@ export const useCalculatorStore = create<CalculatorState>()(
 
         // Calculate connectivity cost
         const connectivityCost = connectivitySection.items
-          .reduce((sum, item) => sum + (getItemCost(item, user?.role || 'user') * item.quantity), 0);
+          .reduce((sum, item) => sum + (getItemCost(item, userRole) * item.quantity), 0);
 
         // Calculate licensing cost
         const licensingCost = licensingSection.items
-          .reduce((sum, item) => sum + (getItemCost(item, user?.role || 'user') * item.quantity), 0);
+          .reduce((sum, item) => sum + (getItemCost(item, userRole) * item.quantity), 0);
 
         // Calculate additional costs with null checks
         const additionalCosts = configStore.scales?.additional_costs?.cost_per_kilometer && configStore.scales?.additional_costs?.cost_per_point ? 

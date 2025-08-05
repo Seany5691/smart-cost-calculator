@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useCalculatorStore } from '@/store/calculator';
 import { useAuthStore } from '@/store/auth';
 import { useConfigStore } from '@/store/config';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, getFactorForDeal } from '@/lib/utils';
 import { TotalCosts } from '@/lib/types';
 import { ChevronLeft, Download, FileText, Printer } from 'lucide-react';
 import PDFGenerator from '../pdf/PDFGenerator';
@@ -16,7 +16,7 @@ interface TotalCostsSectionProps {
 export default function TotalCostsSection({ onPrev }: TotalCostsSectionProps) {
   const { calculateTotalCosts, dealDetails, saveDeal, updateDealDetails } = useCalculatorStore();
   const { user } = useAuthStore();
-  const { scales } = useConfigStore();
+  const { scales, factors } = useConfigStore();
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [editableTotalGrossProfit, setEditableTotalGrossProfit] = useState<number | null>(null);
@@ -24,8 +24,6 @@ export default function TotalCostsSection({ onPrev }: TotalCostsSectionProps) {
     extensionCount: 0,
     hardwareTotal: 0,
     hardwareInstallTotal: 0,
-    baseGrossProfit: 0,
-    additionalProfit: 0,
     totalGrossProfit: 0,
     financeFee: 0,
     settlementAmount: 0,
@@ -40,13 +38,76 @@ export default function TotalCostsSection({ onPrev }: TotalCostsSectionProps) {
     factorUsed: 0,
   });
 
-  // Calculate totals when component mounts or dealDetails changes
+  // Memoized calculation function that handles custom gross profit
+  const calculateTotalsWithCustomGrossProfit = useCallback((customGrossProfit?: number | null): TotalCosts => {
+    const baseTotals = calculateTotalCosts();
+    
+    if (customGrossProfit !== null && customGrossProfit !== undefined) {
+      // Recalculate with custom gross profit
+      const extensionCount = baseTotals.extensionCount;
+      const hardwareTotal = baseTotals.hardwareTotal;
+      const hardwareInstallTotal = baseTotals.hardwareInstallTotal;
+      const settlementAmount = baseTotals.settlementAmount;
+      const connectivityCost = baseTotals.connectivityCost;
+      const licensingCost = baseTotals.licensingCost;
+      
+      // Calculate extension cost
+      const extensionCost = extensionCount * (scales?.additional_costs?.cost_per_point || 0);
+      
+      // Calculate finance fee based on hardware + installation (for fee calculation only)
+      const feeCalculationAmount = hardwareTotal + hardwareInstallTotal;
+      let financeFee = 0;
+      if (scales?.finance_fee) {
+        for (const [range, fee] of Object.entries(scales.finance_fee)) {
+          const [min, max] = range.split('-').map(Number);
+          if (feeCalculationAmount >= (min || 0) && feeCalculationAmount <= (max || Infinity)) {
+            financeFee = fee;
+            break;
+          }
+        }
+      }
+      
+      // Calculate finance amount with custom gross profit
+      const financeAmount = hardwareTotal + extensionCost + hardwareInstallTotal + customGrossProfit + financeFee + settlementAmount;
+      
+      // Get factor for financing
+      const factorUsed = factors ? 
+        getFactorForDeal(factors, dealDetails.term, dealDetails.escalation, financeAmount) : 0;
+      
+      // Calculate final totals
+      const totalPayout = financeAmount;
+      const hardwareRental = financeAmount * factorUsed;
+      const totalMRC = hardwareRental + connectivityCost + licensingCost;
+      const totalExVat = totalMRC;
+      const totalIncVat = totalExVat * 1.15; // 15% VAT
+
+      return {
+        extensionCount,
+        hardwareTotal,
+        hardwareInstallTotal,
+        totalGrossProfit: customGrossProfit,
+        financeFee,
+        settlementAmount,
+        financeAmount,
+        totalPayout,
+        hardwareRental,
+        connectivityCost,
+        licensingCost,
+        totalMRC,
+        totalExVat,
+        totalIncVat,
+        factorUsed
+      };
+    }
+    
+    return baseTotals;
+  }, [calculateTotalCosts, scales, factors, dealDetails]);
+
+  // Calculate totals when component mounts or dependencies change
   useEffect(() => {
-    const calculatedTotals = calculateTotalCosts();
+    const calculatedTotals = calculateTotalsWithCustomGrossProfit(editableTotalGrossProfit);
     setTotals(calculatedTotals);
-  }, [calculateTotalCosts, dealDetails]);
-
-
+  }, [calculateTotalsWithCustomGrossProfit, editableTotalGrossProfit, dealDetails]);
 
   const handleGenerateProposal = () => {
     // TODO: Implement proposal generation
@@ -74,6 +135,14 @@ export default function TotalCostsSection({ onPrev }: TotalCostsSectionProps) {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleGrossProfitChange = (value: number) => {
+    setEditableTotalGrossProfit(value);
+  };
+
+  const handleResetGrossProfit = () => {
+    setEditableTotalGrossProfit(null);
   };
 
   return (
@@ -114,24 +183,7 @@ export default function TotalCostsSection({ onPrev }: TotalCostsSectionProps) {
                 </tr>
                 <tr>
                   <td className="py-2 text-sm text-gray-600">Total Gross Profit</td>
-                  <td className="py-2 text-sm text-gray-900 text-right font-medium">
-                    <div className="flex items-center justify-end space-x-2">
-                      <input
-                        type="number"
-                        value={editableTotalGrossProfit !== null ? editableTotalGrossProfit : totals.totalGrossProfit}
-                        onChange={(e) => {
-                          const value = parseFloat(e.target.value) || 0;
-                          setEditableTotalGrossProfit(value);
-                          // Update the totals with the new value
-                          const newTotals = { ...totals, totalGrossProfit: value };
-                          setTotals(newTotals);
-                        }}
-                        className="w-24 text-right border border-gray-300 rounded px-2 py-1 text-sm"
-                        placeholder={formatCurrency(totals.totalGrossProfit)}
-                      />
-                      <span className="text-xs text-gray-500">(Default: {formatCurrency(totals.totalGrossProfit)})</span>
-                    </div>
-                  </td>
+                  <td className="py-2 text-sm text-gray-900 text-right font-medium">{formatCurrency(totals.totalGrossProfit)}</td>
                 </tr>
                 <tr>
                   <td className="py-2 text-sm text-gray-600">Finance Fee</td>
@@ -196,6 +248,43 @@ export default function TotalCostsSection({ onPrev }: TotalCostsSectionProps) {
         </div>
       </div>
 
+      {/* Total Gross Profit Card */}
+      <div className="card">
+        <div className="border-b border-gray-200 p-4">
+          <h3 className="text-lg font-semibold text-gray-900">Total Gross Profit</h3>
+        </div>
+        <div className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600 mb-2">Adjust the total gross profit for this deal</p>
+              <p className="text-xs text-gray-500">
+                Default value based on scales configuration: {formatCurrency(calculateTotalCosts().totalGrossProfit)}
+              </p>
+            </div>
+            <div className="flex items-center space-x-3">
+              <input
+                type="number"
+                value={editableTotalGrossProfit !== null ? editableTotalGrossProfit : totals.totalGrossProfit}
+                onChange={(e) => {
+                  const value = parseFloat(e.target.value) || 0;
+                  handleGrossProfitChange(value);
+                }}
+                className="w-32 text-right border border-gray-300 rounded px-3 py-2 text-lg font-medium focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder={formatCurrency(totals.totalGrossProfit)}
+                step="0.01"
+                min="0"
+              />
+              <button
+                onClick={handleResetGrossProfit}
+                className="btn btn-outline btn-sm"
+              >
+                Reset to Default
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Deal Information */}
       <div className="card">
         <div className="border-b border-gray-200 p-4">
@@ -219,7 +308,6 @@ export default function TotalCostsSection({ onPrev }: TotalCostsSectionProps) {
               <p className="font-semibold text-gray-700 text-sm">Distance to Install</p>
               <p className="text-gray-900">{dealDetails.distanceToInstall} km</p>
             </div>
-
             <div>
               <p className="font-semibold text-gray-700 text-sm">Settlement Amount</p>
               <p className="text-gray-900">{formatCurrency(dealDetails.settlement)}</p>

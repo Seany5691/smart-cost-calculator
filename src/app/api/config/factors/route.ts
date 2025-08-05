@@ -1,17 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { promises as fs } from 'fs';
-import path from 'path';
+import { supabaseHelpers } from '@/lib/supabase';
 import { FactorData } from '@/lib/types';
-
-const configPath = path.join(process.cwd(), 'public', 'config', 'factors.json');
 
 export async function GET() {
   try {
-    const data = await fs.readFile(configPath, 'utf8');
-    const factors = JSON.parse(data);
+    const factors = await supabaseHelpers.getFactors();
     return NextResponse.json(factors);
   } catch (error) {
-    console.error('Error reading factors config:', error);
+    console.error('Error reading factors config from Supabase:', error);
     return NextResponse.json({ error: 'Failed to read factors config' }, { status: 500 });
   }
 }
@@ -21,16 +17,20 @@ export async function POST(request: NextRequest) {
     const factors: FactorData = await request.json();
     
     // Validate the data
-    if (typeof factors !== 'object' || factors === null) {
+    if (!factors || typeof factors !== 'object') {
       return NextResponse.json({ error: 'Invalid data format' }, { status: 400 });
     }
 
-    // Write to file
-    await fs.writeFile(configPath, JSON.stringify(factors, null, 2));
+    // Save to Supabase
+    const savedFactors = await supabaseHelpers.updateFactors(factors);
     
-    return NextResponse.json({ success: true, message: 'Factors config updated successfully' });
+    return NextResponse.json({ 
+      success: true, 
+      message: 'Factors config updated successfully',
+      data: savedFactors
+    });
   } catch (error) {
-    console.error('Error writing factors config:', error);
+    console.error('Error writing factors config to Supabase:', error);
     return NextResponse.json({ error: 'Failed to update factors config' }, { status: 500 });
   }
 } 

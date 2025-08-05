@@ -22,10 +22,11 @@ export default function ConnectivityConfig() {
     setMessage(null);
 
     try {
-      updateConnectivity(items);
-      setMessage({ type: 'success', text: 'Connectivity configuration saved successfully!' });
+      await updateConnectivity(items);
+      setMessage({ type: 'success', text: 'Connectivity configuration saved successfully to Supabase!' });
     } catch (error) {
-      setMessage({ type: 'error', text: 'An error occurred while saving.' });
+      console.error('Error saving connectivity config:', error);
+      setMessage({ type: 'error', text: 'An error occurred while saving to Supabase. Please try again.' });
     } finally {
       setIsLoading(false);
     }
@@ -220,8 +221,19 @@ export default function ConnectivityConfig() {
           className="btn btn-success flex items-center space-x-2"
         >
           <Save className="w-4 h-4" />
-          <span>{isLoading ? 'Saving...' : 'Save Changes'}</span>
+          <span>{isLoading ? 'Saving to Supabase...' : 'Save Changes'}</span>
         </button>
+      </div>
+
+      <div className="bg-blue-50 p-4 rounded-lg">
+        <h3 className="font-semibold text-blue-900 mb-2">Connectivity Configuration Info</h3>
+        <ul className="text-blue-800 text-sm space-y-1">
+          <li><strong>Cost:</strong> Base cost for all users</li>
+          <li><strong>Manager Cost:</strong> Specific cost for manager role users</li>
+          <li><strong>User Cost:</strong> Specific cost for regular users</li>
+          <li><strong>Locked:</strong> Items that cannot be modified in the calculator</li>
+          <li><strong>Changes are saved to Supabase:</strong> All updates are persisted across browsers</li>
+        </ul>
       </div>
     </div>
   );

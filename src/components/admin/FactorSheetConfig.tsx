@@ -20,10 +20,11 @@ export default function FactorSheetConfig() {
     setMessage(null);
 
     try {
-      updateFactors(factorData);
-      setMessage({ type: 'success', text: 'Factor sheet saved successfully!' });
+      await updateFactors(factorData);
+      setMessage({ type: 'success', text: 'Factor sheet saved successfully to Supabase!' });
     } catch (error) {
-      setMessage({ type: 'error', text: 'An error occurred while saving.' });
+      console.error('Error saving factors config:', error);
+      setMessage({ type: 'error', text: 'An error occurred while saving to Supabase. Please try again.' });
     } finally {
       setIsLoading(false);
     }
@@ -56,7 +57,7 @@ export default function FactorSheetConfig() {
           className="btn btn-success flex items-center space-x-2"
         >
           <Save className="w-4 h-4" />
-          <span>{isLoading ? 'Saving...' : 'Save Changes'}</span>
+          <span>{isLoading ? 'Saving to Supabase...' : 'Save Changes'}</span>
         </button>
       </div>
 
@@ -113,10 +114,13 @@ export default function FactorSheetConfig() {
 
       <div className="bg-blue-50 p-4 rounded-lg">
         <h3 className="font-semibold text-blue-900 mb-2">Factor Sheet Information</h3>
-        <p className="text-blue-800 text-sm">
-          The factor sheet determines the monthly rental rates for hardware financing. 
-          Factors are applied based on the contract term, escalation rate, and finance amount range.
-        </p>
+        <ul className="text-blue-800 text-sm space-y-1">
+          <li><strong>Term:</strong> Contract duration in months</li>
+          <li><strong>Escalation:</strong> Annual price increase percentage</li>
+          <li><strong>Finance Range:</strong> Total finance amount range</li>
+          <li><strong>Factor:</strong> Monthly rental rate multiplier (e.g., 0.03814 = 3.814% per month)</li>
+          <li><strong>Changes are saved to Supabase:</strong> All updates are persisted across browsers</li>
+        </ul>
       </div>
     </div>
   );

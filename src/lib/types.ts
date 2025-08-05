@@ -79,8 +79,8 @@ export interface AuthState {
   addUser: (user: User) => void;
   updateUser: (id: string, updates: Partial<User>) => void;
   deleteUser: (id: string) => void;
-  changePassword: (userId: string, newPassword: string) => void;
-  resetPassword: (userId: string, newPassword: string) => void;
+  changePassword: (userId: string, newPassword: string) => Promise<void>;
+  resetPassword: (userId: string, newPassword: string) => Promise<void>;
   syncUsersToGlobalStorage: () => void;
   loadUsersFromGlobalStorage: () => boolean;
   initializeUsers: () => void;

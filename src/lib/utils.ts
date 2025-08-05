@@ -15,7 +15,12 @@ export const formatNumber = (num: number, decimals: number = 2): string => {
 };
 
 export const generateId = (): string => {
-  return `id_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  // Generate a proper UUID v4
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
 };
 
 export const calculateSettlement = (
@@ -140,11 +145,27 @@ export const getItemCost = (
   item: Item,
   userRole: 'admin' | 'manager' | 'user' = 'user'
 ): number => {
-  if (userRole === 'manager' && item.managerCost !== undefined) {
-    return item.managerCost;
-  } else if (userRole === 'user' && item.userCost !== undefined) {
-    return item.userCost;
-  } else {
-    return item.cost;
+  let selectedCost: number;
+  let costType: string;
+  
+  // Admin and Manager should use managerCost
+  if ((userRole === 'admin' || userRole === 'manager') && item.managerCost !== undefined && item.managerCost !== null) {
+    selectedCost = item.managerCost;
+    costType = 'managerCost';
+  } 
+  // User should use userCost
+  else if (userRole === 'user' && item.userCost !== undefined && item.userCost !== null) {
+    selectedCost = item.userCost;
+    costType = 'userCost';
+  } 
+  // Fallback to regular cost if specific pricing is not available
+  else {
+    selectedCost = item.cost;
+    costType = 'cost';
   }
+  
+  // Debug logging for pricing selection
+  console.log(`Item: ${item.name}, Role: ${userRole}, Using: ${costType} = ${selectedCost}`);
+  
+  return selectedCost;
 }; 

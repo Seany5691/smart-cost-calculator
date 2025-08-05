@@ -1,142 +1,211 @@
 -- Smart Cost Calculator Database Schema
--- Run this in your Supabase SQL Editor
+-- Complete Supabase integration with exact data matching
 
--- Enable Row Level Security (RLS)
-ALTER DATABASE postgres SET "app.jwt_secret" TO 'your-jwt-secret';
+-- Enable necessary extensions
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- Create custom types
-CREATE TYPE user_role AS ENUM ('admin', 'manager', 'user');
-
--- Users table
+-- Users table for authentication and role management
 CREATE TABLE users (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    username VARCHAR(50) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
-    role user_role NOT NULL DEFAULT 'user',
-    name VARCHAR(100) NOT NULL,
-    email VARCHAR(255) UNIQUE NOT NULL,
-    is_active BOOLEAN DEFAULT true,
-    requires_password_change BOOLEAN DEFAULT false,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    username VARCHAR(255) UNIQUE NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    role VARCHAR(50) NOT NULL DEFAULT 'user' CHECK (role IN ('user', 'manager', 'admin')),
+    name VARCHAR(255) NOT NULL,
+    email VARCHAR(255) NOT NULL,
+    isActive BOOLEAN DEFAULT true,
+    requiresPasswordChange BOOLEAN DEFAULT false,
+    createdAt TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updatedAt TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Hardware items table
+-- Hardware items table with exact data structure (camelCase column names)
 CREATE TABLE hardware_items (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    id VARCHAR(255) PRIMARY KEY,  -- Using string IDs to match existing data
     name VARCHAR(255) NOT NULL,
     cost DECIMAL(10,2) NOT NULL,
-    is_extension BOOLEAN DEFAULT false,
-    is_active BOOLEAN DEFAULT true,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    managerCost DECIMAL(10,2),
+    userCost DECIMAL(10,2),
+    quantity INTEGER DEFAULT 0,
+    locked BOOLEAN DEFAULT false,
+    isExtension BOOLEAN DEFAULT false,
+    isActive BOOLEAN DEFAULT true,
+    createdAt TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updatedAt TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Connectivity items table
+-- Connectivity items table (camelCase column names)
 CREATE TABLE connectivity_items (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    id VARCHAR(255) PRIMARY KEY,  -- Using string IDs to match existing data
     name VARCHAR(255) NOT NULL,
     cost DECIMAL(10,2) NOT NULL,
-    is_active BOOLEAN DEFAULT true,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    managerCost DECIMAL(10,2),
+    userCost DECIMAL(10,2),
+    quantity INTEGER DEFAULT 0,
+    locked BOOLEAN DEFAULT false,
+    isActive BOOLEAN DEFAULT true,
+    createdAt TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updatedAt TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Licensing items table
+-- Licensing items table (camelCase column names)
 CREATE TABLE licensing_items (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    id VARCHAR(255) PRIMARY KEY,  -- Using string IDs to match existing data
     name VARCHAR(255) NOT NULL,
     cost DECIMAL(10,2) NOT NULL,
-    is_active BOOLEAN DEFAULT true,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    managerCost DECIMAL(10,2),
+    userCost DECIMAL(10,2),
+    quantity INTEGER DEFAULT 0,
+    locked BOOLEAN DEFAULT false,
+    isActive BOOLEAN DEFAULT true,
+    createdAt TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updatedAt TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Factors table (JSON structure)
+-- Factors table for financing calculations
 CREATE TABLE factors (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     factors_data JSONB NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    createdAt TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updatedAt TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Scales table (JSON structure)
+-- Scales table for pricing calculations
 CREATE TABLE scales (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     scales_data JSONB NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    createdAt TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updatedAt TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Deal calculations table
+-- Deal calculations table for storing completed deals
 CREATE TABLE deal_calculations (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-    customer_name VARCHAR(255),
-    distance_to_install INTEGER,
-    term INTEGER,
-    escalation DECIMAL(5,2),
-    total_gross_profit DECIMAL(10,2), -- New editable field
-    settlement DECIMAL(10,2),
-    sections_data JSONB NOT NULL,
-    totals_data JSONB NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    userId UUID REFERENCES users(id),
+    username VARCHAR(255),
+    userRole VARCHAR(50),
+    dealName VARCHAR(255),
+    customerName VARCHAR(255),
+    dealDetails JSONB NOT NULL,
+    sectionsData JSONB NOT NULL,
+    totalsData JSONB NOT NULL,
+    factorsData JSONB NOT NULL,
+    scalesData JSONB NOT NULL,
+    pdfUrl VARCHAR(500),
+    createdAt TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updatedAt TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Insert default admin user
-INSERT INTO users (username, password_hash, role, name, email, is_active, requires_password_change) 
-VALUES (
-    'Camryn', 
-    '$2a$10$your-hashed-password-here', -- You'll need to hash 'Elliot6242!'
-    'admin', 
-    'Camryn Admin', 
-    'camryn@company.com', 
-    true, 
-    false
-);
+-- Indexes for performance
+CREATE INDEX idx_users_username ON users(username);
+CREATE INDEX idx_users_role ON users(role);
+CREATE INDEX idx_hardware_items_active ON hardware_items(isActive);
+CREATE INDEX idx_connectivity_items_active ON connectivity_items(isActive);
+CREATE INDEX idx_licensing_items_active ON licensing_items(isActive);
+CREATE INDEX idx_deal_calculations_user_id ON deal_calculations(userId);
+CREATE INDEX idx_deal_calculations_created_at ON deal_calculations(createdAt);
 
--- Insert default hardware items
-INSERT INTO hardware_items (name, cost, is_extension) VALUES
-('Desk Phone B&W', 1054.00, true),
-('Desk Phone Colour', 1378.00, true),
-('Switchboard Colour', 2207.00, true),
-('Cordless Phone', 2420.00, true),
-('Bluetooth Headset Mono', 1996.00, false),
-('Bluetooth Headset Dual', 2340.00, false),
-('Corded Headset Dual', 1467.00, false),
-('Cellphone', 7500.00, false),
-('4 Port PoE', 644.00, false),
-('8 Port PoE', 813.00, false),
-('16 Port PoE', 2282.00, false),
-('8 Port Managed PoE', 1657.00, false),
-('16 Port Managed PoE', 2994.00, false),
-('Access Point Gigabit', 1350.00, false),
-('Cloud Router WAN2', 1613.00, false),
-('5G/LTE Router', 1800.00, false),
-('PC', 9000.00, false),
-('A4 Copier', 17000.00, false),
-('Server Cabinet', 1466.25, false),
-('Additional Mobile App', 0.00, false),
-('Additional App on Own Device', 0.00, false),
-('Number Porting Per Number', 200.00, false);
+-- Views for easier data access
+CREATE VIEW active_hardware_items AS
+SELECT * FROM hardware_items WHERE isActive = true ORDER BY name;
 
--- Insert default connectivity items
-INSERT INTO connectivity_items (name, cost) VALUES
-('LTE', 599.00),
-('Fibre', 599.00),
-('Melon Sim Card', 350.00);
+CREATE VIEW active_connectivity_items AS
+SELECT * FROM connectivity_items WHERE isActive = true ORDER BY name;
 
--- Insert default licensing items
-INSERT INTO licensing_items (name, cost) VALUES
-('Premium License', 90.00),
-('Service Level Agreement (0 - 5 users)', 299.00),
-('Service Level Agreement (6 - 10 users)', 399.00),
-('Service Level Agreement (11 users or more)', 499.00);
+CREATE VIEW active_licensing_items AS
+SELECT * FROM licensing_items WHERE isActive = true ORDER BY name;
 
--- Insert default factors
-INSERT INTO factors (factors_data) VALUES (
-'{
+-- Helper functions
+CREATE OR REPLACE FUNCTION get_latest_factors()
+RETURNS JSONB AS $$
+BEGIN
+    RETURN (SELECT factors_data FROM factors ORDER BY createdAt DESC LIMIT 1);
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION get_latest_scales()
+RETURNS JSONB AS $$
+BEGIN
+    RETURN (SELECT scales_data FROM scales ORDER BY createdAt DESC LIMIT 1);
+END;
+$$ LANGUAGE plpgsql;
+
+-- Enable Row Level Security (but with permissive policies for now)
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE hardware_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE connectivity_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE licensing_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE factors ENABLE ROW LEVEL SECURITY;
+ALTER TABLE scales ENABLE ROW LEVEL SECURITY;
+ALTER TABLE deal_calculations ENABLE ROW LEVEL SECURITY;
+
+-- Permissive policies for development (allow all operations)
+-- TODO: Replace with proper authentication-based policies in production
+
+-- Users policies - allow all operations
+CREATE POLICY "Allow all users operations" ON users FOR ALL USING (true) WITH CHECK (true);
+
+-- Hardware items policies - allow all operations
+CREATE POLICY "Allow all hardware operations" ON hardware_items FOR ALL USING (true) WITH CHECK (true);
+
+-- Connectivity items policies - allow all operations
+CREATE POLICY "Allow all connectivity operations" ON connectivity_items FOR ALL USING (true) WITH CHECK (true);
+
+-- Licensing items policies - allow all operations
+CREATE POLICY "Allow all licensing operations" ON licensing_items FOR ALL USING (true) WITH CHECK (true);
+
+-- Factors policies - allow all operations
+CREATE POLICY "Allow all factors operations" ON factors FOR ALL USING (true) WITH CHECK (true);
+
+-- Scales policies - allow all operations
+CREATE POLICY "Allow all scales operations" ON scales FOR ALL USING (true) WITH CHECK (true);
+
+-- Deal calculations policies - allow all operations
+CREATE POLICY "Allow all deal operations" ON deal_calculations FOR ALL USING (true) WITH CHECK (true);
+
+-- Insert default admin user (Camryn - cannot be removed or changed)
+INSERT INTO users (username, password, role, name, email, isActive, requiresPasswordChange) VALUES 
+('Camryn', 'Elliot6242!', 'admin', 'Camryn', 'Camryn@smartintegrate.co.za', true, false);
+
+-- Insert exact hardware items from JSON (with managerCost and userCost set to cost)
+INSERT INTO hardware_items (id, name, cost, managerCost, userCost, quantity, locked, isExtension) VALUES
+('hw1', 'Desk Phone B&W', 1054.00, 1054.00, 1054.00, 0, false, true),
+('hw2', 'Desk Phone Colour', 1378.00, 1378.00, 1378.00, 0, false, true),
+('hw3', 'Switchboard Colour', 2207.00, 2207.00, 2207.00, 0, false, true),
+('hw4', 'Cordless Phone', 2420.00, 2420.00, 2420.00, 0, false, true),
+('hw5', 'Bluetooth Headset Mono', 1996.00, 1996.00, 1996.00, 0, false, false),
+('hw6', 'Bluetooth Headset Dual', 2340.00, 2340.00, 2340.00, 0, false, false),
+('hw7', 'Corded Headset Dual', 1467.00, 1467.00, 1467.00, 0, false, false),
+('hw8', 'Cellphone', 7500.00, 7500.00, 7500.00, 0, false, false),
+('hw9', '4 Port PoE', 644.00, 644.00, 644.00, 0, false, false),
+('hw10', '8 Port PoE', 813.00, 813.00, 813.00, 0, false, false),
+('hw11', '16 Port PoE', 2282.00, 2282.00, 2282.00, 0, false, false),
+('hw12', '8 Port Managed PoE', 1657.00, 1657.00, 1657.00, 0, false, false),
+('hw13', '16 Port Managed PoE', 2994.00, 2994.00, 2994.00, 0, false, false),
+('hw14', 'Access Point Gigabit', 1350.00, 1350.00, 1350.00, 0, false, false),
+('hw15', 'Cloud Router WAN2', 1613.00, 1613.00, 1613.00, 0, false, false),
+('hw16', '5G/LTE Router', 1800.00, 1800.00, 1800.00, 0, false, false),
+('hw17', 'PC', 9000.00, 9000.00, 9000.00, 0, false, false),
+('hw18', 'A4 Copier', 17000.00, 17000.00, 17000.00, 0, false, false),
+('hw19', 'Server Cabinet', 1466.25, 1466.25, 1466.25, 0, false, false),
+('hw20', 'Additional Mobile App', 0.00, 0.00, 0.00, 0, false, false),
+('hw21', 'Additional App on Own Device', 0.00, 0.00, 0.00, 0, false, false),
+('hw22', 'Number Porting Per Number', 200.00, 200.00, 200.00, 0, false, false);
+
+-- Insert exact connectivity items from JSON (with managerCost and userCost set to cost)
+INSERT INTO connectivity_items (id, name, cost, managerCost, userCost, quantity, locked) VALUES
+('conn1', 'LTE', 599.00, 599.00, 599.00, 0, false),
+('conn2', 'Fibre', 599.00, 599.00, 599.00, 0, false),
+('conn3', 'Melon Sim Card', 350.00, 350.00, 350.00, 0, false);
+
+-- Insert exact licensing items from JSON (with managerCost and userCost set to cost)
+INSERT INTO licensing_items (id, name, cost, managerCost, userCost, quantity, locked) VALUES
+('lic1', 'Premium License', 90.00, 90.00, 90.00, 0, false),
+('lic2', 'Service Level Agreement (0 - 5 users)', 299.00, 299.00, 299.00, 0, false),
+('lic3', 'Service Level Agreement (6 - 10 users)', 399.00, 399.00, 399.00, 0, false),
+('lic4', 'Service Level Agreement (11 users or more)', 499.00, 499.00, 499.00, 0, false);
+
+-- Insert exact factors data from JSON
+INSERT INTO factors (factors_data) VALUES ('{
   "36_months": {
     "0%": {
       "0-20000": 0.03814,
@@ -197,12 +266,10 @@ INSERT INTO factors (factors_data) VALUES (
       "100000+": 0.02607
     }
   }
-}'::jsonb
-);
+}'::jsonb);
 
--- Insert default scales
-INSERT INTO scales (scales_data) VALUES (
-'{
+-- Insert exact scales data from JSON
+INSERT INTO scales (scales_data) VALUES ('{
   "installation": {
     "0-4": 3500,
     "5-8": 3500,
@@ -227,63 +294,7 @@ INSERT INTO scales (scales_data) VALUES (
     "cost_per_kilometer": 1.5,
     "cost_per_point": 750
   }
-}'::jsonb
-);
+}'::jsonb);
 
--- Create indexes for better performance
-CREATE INDEX idx_users_username ON users(username);
-CREATE INDEX idx_users_role ON users(role);
-CREATE INDEX idx_deal_calculations_user_id ON deal_calculations(user_id);
-CREATE INDEX idx_deal_calculations_created_at ON deal_calculations(created_at);
-
--- Enable Row Level Security
-ALTER TABLE users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE hardware_items ENABLE ROW LEVEL SECURITY;
-ALTER TABLE connectivity_items ENABLE ROW LEVEL SECURITY;
-ALTER TABLE licensing_items ENABLE ROW LEVEL SECURITY;
-ALTER TABLE factors ENABLE ROW LEVEL SECURITY;
-ALTER TABLE scales ENABLE ROW LEVEL SECURITY;
-ALTER TABLE deal_calculations ENABLE ROW LEVEL SECURITY;
-
--- Create RLS policies
--- Users can read all data
-CREATE POLICY "Users can read all data" ON users FOR SELECT USING (true);
-CREATE POLICY "Hardware items are readable by all" ON hardware_items FOR SELECT USING (true);
-CREATE POLICY "Connectivity items are readable by all" ON connectivity_items FOR SELECT USING (true);
-CREATE POLICY "Licensing items are readable by all" ON licensing_items FOR SELECT USING (true);
-CREATE POLICY "Factors are readable by all" ON factors FOR SELECT USING (true);
-CREATE POLICY "Scales are readable by all" ON scales FOR SELECT USING (true);
-
--- Admin can modify all data
-CREATE POLICY "Admin can modify all data" ON hardware_items FOR ALL USING (true);
-CREATE POLICY "Admin can modify all data" ON connectivity_items FOR ALL USING (true);
-CREATE POLICY "Admin can modify all data" ON licensing_items FOR ALL USING (true);
-CREATE POLICY "Admin can modify all data" ON factors FOR ALL USING (true);
-CREATE POLICY "Admin can modify all data" ON scales FOR ALL USING (true);
-
--- Users can only see their own deals
-CREATE POLICY "Users can view own deals" ON deal_calculations FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can insert own deals" ON deal_calculations FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can update own deals" ON deal_calculations FOR UPDATE USING (auth.uid() = user_id);
-CREATE POLICY "Users can delete own deals" ON deal_calculations FOR DELETE USING (auth.uid() = user_id);
-
--- Admin can see all deals
-CREATE POLICY "Admin can view all deals" ON deal_calculations FOR ALL USING (true);
-
--- Create functions for updated_at timestamps
-CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = NOW();
-    RETURN NEW;
-END;
-$$ language 'plpgsql';
-
--- Create triggers for updated_at
-CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_hardware_items_updated_at BEFORE UPDATE ON hardware_items FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_connectivity_items_updated_at BEFORE UPDATE ON connectivity_items FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_licensing_items_updated_at BEFORE UPDATE ON licensing_items FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_factors_updated_at BEFORE UPDATE ON factors FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_scales_updated_at BEFORE UPDATE ON scales FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_deal_calculations_updated_at BEFORE UPDATE ON deal_calculations FOR EACH ROW EXECUTE FUNCTION update_updated_at_column(); 
+-- Success message
+SELECT 'Smart Cost Calculator database schema created successfully!' as status; 

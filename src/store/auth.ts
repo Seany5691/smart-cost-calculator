@@ -80,8 +80,19 @@ export const useAuthStore = create<AuthState>()(
       users: [DEFAULT_ADMIN, ...SAMPLE_USERS],
 
       login: async (username: string, password: string) => {
-        const { users } = get();
-        const user = users.find(u => u.username === username && u.password === password && u.isActive);
+        let { users } = get();
+        let user = users.find(u => u.username === username && u.password === password && u.isActive);
+        
+        // If user not found locally, try to load from Supabase
+        if (!user) {
+          try {
+            await get().initializeUsers();
+            users = get().users;
+            user = users.find(u => u.username === username && u.password === password && u.isActive);
+          } catch (error) {
+            console.error('Error loading users from Supabase during login:', error);
+          }
+        }
         
         if (user) {
           set({ isAuthenticated: true, user });
@@ -99,57 +110,167 @@ export const useAuthStore = create<AuthState>()(
         return isAuthenticated;
       },
 
-      addUser: (user: User) => {
-        set((state) => ({
-          users: [...state.users, user]
-        }));
-        // Sync to global storage immediately
-        get().syncUsersToGlobalStorage();
+      addUser: async (user: User) => {
+        try {
+          // Save to Supabase
+          const response = await fetch('/api/users', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(user)
+          });
+          
+          if (!response.ok) {
+            throw new Error('Failed to save user to Supabase');
+          }
+          
+          const result = await response.json();
+          
+          // Update local state
+          set((state) => ({
+            users: [...state.users, result.data]
+          }));
+          
+          // Sync to global storage for backward compatibility
+          get().syncUsersToGlobalStorage();
+          
+          console.log('User added successfully to Supabase');
+        } catch (error) {
+          console.error('Error adding user:', error);
+          throw error;
+        }
       },
 
-      updateUser: (id: string, updates: Partial<User>) => {
-        set((state) => ({
-          users: state.users.map(user => 
-            user.id === id ? { ...user, ...updates } : user
-          )
-        }));
-        // Sync to global storage immediately
-        get().syncUsersToGlobalStorage();
+      updateUser: async (id: string, updates: Partial<User>) => {
+        try {
+          // Save to Supabase
+          const response = await fetch('/api/users', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id, updates })
+          });
+          
+          if (!response.ok) {
+            throw new Error('Failed to update user in Supabase');
+          }
+          
+          const result = await response.json();
+          
+          // Update local state
+          set((state) => ({
+            users: state.users.map(user => 
+              user.id === id ? { ...user, ...updates } : user
+            )
+          }));
+          
+          // Sync to global storage for backward compatibility
+          get().syncUsersToGlobalStorage();
+          
+          console.log('User updated successfully in Supabase');
+        } catch (error) {
+          console.error('Error updating user:', error);
+          throw error;
+        }
       },
 
-      deleteUser: (id: string) => {
-        set((state) => ({
-          users: state.users.filter(user => user.id !== id)
-        }));
-        // Sync to global storage immediately
-        get().syncUsersToGlobalStorage();
+      deleteUser: async (id: string) => {
+        try {
+          // Save to Supabase
+          const response = await fetch('/api/users', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id })
+          });
+          
+          if (!response.ok) {
+            throw new Error('Failed to delete user from Supabase');
+          }
+          
+          // Update local state
+          set((state) => ({
+            users: state.users.filter(user => user.id !== id)
+          }));
+          
+          // Sync to global storage for backward compatibility
+          get().syncUsersToGlobalStorage();
+          
+          console.log('User deleted successfully from Supabase');
+        } catch (error) {
+          console.error('Error deleting user:', error);
+          throw error;
+        }
       },
 
-      changePassword: (userId: string, newPassword: string) => {
-        set((state) => ({
-          users: state.users.map(user => 
-            user.id === userId 
-              ? { ...user, password: newPassword, requiresPasswordChange: false, updatedAt: new Date() }
-              : user
-          ),
-          user: state.user?.id === userId 
-            ? { ...state.user, password: newPassword, requiresPasswordChange: false, updatedAt: new Date() }
-            : state.user
-        }));
-        // Sync to global storage immediately
-        get().syncUsersToGlobalStorage();
+      changePassword: async (userId: string, newPassword: string) => {
+        try {
+          // Update in Supabase
+          await fetch('/api/users', {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              id: userId,
+              updates: {
+                password: newPassword,
+                requiresPasswordChange: false,
+                updatedAt: new Date().toISOString()
+              }
+            })
+          });
+
+          // Update local state
+          set((state) => ({
+            users: state.users.map(user => 
+              user.id === userId 
+                ? { ...user, password: newPassword, requiresPasswordChange: false, updatedAt: new Date() }
+                : user
+            ),
+            user: state.user?.id === userId 
+              ? { ...state.user, password: newPassword, requiresPasswordChange: false, updatedAt: new Date() }
+              : state.user
+          }));
+          
+          // Sync to global storage immediately
+          get().syncUsersToGlobalStorage();
+        } catch (error) {
+          console.error('Error changing password:', error);
+          throw error;
+        }
       },
 
-      resetPassword: (userId: string, newPassword: string) => {
-        set((state) => ({
-          users: state.users.map(user => 
-            user.id === userId 
-              ? { ...user, password: newPassword, requiresPasswordChange: true, updatedAt: new Date() }
-              : user
-          )
-        }));
-        // Sync to global storage immediately
-        get().syncUsersToGlobalStorage();
+      resetPassword: async (userId: string, newPassword: string) => {
+        try {
+          // Update in Supabase
+          await fetch('/api/users', {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              id: userId,
+              updates: {
+                password: newPassword,
+                requiresPasswordChange: true,
+                updatedAt: new Date().toISOString()
+              }
+            })
+          });
+
+          // Update local state
+          set((state) => ({
+            users: state.users.map(user => 
+              user.id === userId 
+                ? { ...user, password: newPassword, requiresPasswordChange: true, updatedAt: new Date() }
+                : user
+            )
+          }));
+          
+          // Sync to global storage immediately
+          get().syncUsersToGlobalStorage();
+        } catch (error) {
+          console.error('Error resetting password:', error);
+          throw error;
+        }
       },
 
       syncUsersToGlobalStorage: () => {
@@ -199,8 +320,21 @@ export const useAuthStore = create<AuthState>()(
         return false;
       },
 
-      initializeUsers: () => {
-        // First, try to load from global storage
+      initializeUsers: async () => {
+        try {
+          // Try to load from Supabase first
+          const response = await fetch('/api/users');
+          if (response.ok) {
+            const users = await response.json();
+            set({ users });
+            console.log('Users loaded from Supabase successfully');
+            return;
+          }
+        } catch (error) {
+          console.error('Error loading users from Supabase:', error);
+        }
+        
+        // Fallback to global storage
         const globalLoaded = get().loadUsersFromGlobalStorage();
         if (!globalLoaded) {
           // If no global data, sync current users to global storage

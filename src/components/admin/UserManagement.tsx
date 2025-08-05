@@ -14,40 +14,58 @@ export default function UserManagement() {
   const [resetPasswordUser, setResetPasswordUser] = useState<string | null>(null);
   const [newPassword, setNewPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  
+  // Local state for editing user data
+  const [editingUserData, setEditingUserData] = useState<Partial<User>>({});
 
   const handleAddUser = () => {
-    const newUser: User = {
-      id: generateId(),
+    const newUserId = generateId();
+    setEditingUser(newUserId);
+    setEditingUserData({
+      id: newUserId,
       username: '',
-      password: 'temp123', // Default temporary password
+      password: 'temp123',
       role: 'user',
       name: '',
       email: '',
       isActive: true,
-      requiresPasswordChange: true, // New users must change password on first login
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    addUser(newUser);
-    setEditingUser(newUser.id);
+      requiresPasswordChange: true
+    });
+    setMessage(null);
   };
 
-  const handleDeleteUser = (id: string) => {
+  const handleDeleteUser = async (id: string) => {
     const user = users.find(u => u.id === id);
     if (user?.username === 'Camryn') {
       setMessage({ type: 'error', text: 'Cannot delete the default admin user (Camryn).' });
       return;
     }
-    deleteUser(id);
-    setMessage({ type: 'success', text: 'User deleted successfully!' });
+    
+    setIsLoading(true);
+    setMessage(null);
+    
+    try {
+      await deleteUser(id);
+      setMessage({ type: 'success', text: 'User deleted successfully from Supabase!' });
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      setMessage({ type: 'error', text: 'Failed to delete user. Please try again.' });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleEditUser = (id: string) => {
-    setEditingUser(id);
+    const user = users.find(u => u.id === id);
+    if (user) {
+      setEditingUser(id);
+      setEditingUserData({ ...user });
+    }
   };
 
   const handleCancelEdit = () => {
     setEditingUser(null);
+    setEditingUserData({});
   };
 
   const handleUpdateUser = (id: string, updates: Partial<User>) => {
@@ -57,12 +75,48 @@ export default function UserManagement() {
       return;
     }
     
-    updateUser(id, { ...updates, updatedAt: new Date() });
+    // Update local state instead of calling API
+    setEditingUserData(prev => ({ ...prev, ...updates }));
   };
 
-  const handleSaveUser = (id: string) => {
-    setEditingUser(null);
-    setMessage({ type: 'success', text: 'User updated successfully!' });
+  const handleSaveUser = async (id: string) => {
+    setIsLoading(true);
+    setMessage(null);
+    
+    try {
+      // Check if this is a new user or existing user
+      const existingUser = users.find(u => u.id === id);
+      
+      if (existingUser) {
+        // Update existing user
+        await updateUser(id, { 
+          ...editingUserData, 
+          updatedAt: new Date().toISOString() 
+        });
+        setMessage({ type: 'success', text: 'User updated successfully!' });
+      } else {
+        // Create new user
+        const newUser: User = {
+          ...editingUserData as User,
+          id,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        };
+        await addUser(newUser);
+        setMessage({ type: 'success', text: 'User created successfully!' });
+      }
+      
+      // Small delay to ensure state updates properly
+      setTimeout(() => {
+        setEditingUser(null);
+        setEditingUserData({});
+      }, 100);
+    } catch (error) {
+      console.error('Error saving user:', error);
+      setMessage({ type: 'error', text: 'Failed to save user. Please try again.' });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleResetPassword = (userId: string) => {
@@ -70,7 +124,7 @@ export default function UserManagement() {
     setNewPassword('');
   };
 
-  const handleConfirmResetPassword = () => {
+  const handleConfirmResetPassword = async () => {
     if (!resetPasswordUser || !newPassword.trim()) {
       setMessage({ type: 'error', text: 'Please enter a new password' });
       return;
@@ -81,10 +135,18 @@ export default function UserManagement() {
       return;
     }
 
-    resetPassword(resetPasswordUser, newPassword);
-    setResetPasswordUser(null);
-    setNewPassword('');
-    setMessage({ type: 'success', text: 'Password reset successfully! User will be required to change password on next login.' });
+    setIsLoading(true);
+    try {
+      await resetPassword(resetPasswordUser, newPassword);
+      setResetPasswordUser(null);
+      setNewPassword('');
+      setMessage({ type: 'success', text: 'Password reset successfully! User will be required to change password on next login.' });
+    } catch (error) {
+      console.error('Error resetting password:', error);
+      setMessage({ type: 'error', text: 'Failed to reset password. Please try again.' });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleCancelResetPassword = () => {
@@ -150,13 +212,14 @@ export default function UserManagement() {
               </tr>
             </thead>
             <tbody>
+                            {/* Show existing users */}
               {users.map((user) => (
                 <tr key={user.id} className="border-b border-gray-100 hover:bg-gray-50">
                   <td className="py-3 px-4">
                     {editingUser === user.id ? (
                       <input
                         type="text"
-                        value={user.name}
+                        value={editingUserData.name || ''}
                         onChange={(e) => handleUpdateUser(user.id, { name: e.target.value })}
                         className="input w-full"
                       />
@@ -168,7 +231,7 @@ export default function UserManagement() {
                     {editingUser === user.id ? (
                       <input
                         type="text"
-                        value={user.username}
+                        value={editingUserData.username || ''}
                         onChange={(e) => handleUpdateUser(user.id, { username: e.target.value })}
                         className="input w-full"
                         disabled={user.username === 'Camryn'}
@@ -181,7 +244,7 @@ export default function UserManagement() {
                     {editingUser === user.id ? (
                       <input
                         type="email"
-                        value={user.email}
+                        value={editingUserData.email || ''}
                         onChange={(e) => handleUpdateUser(user.id, { email: e.target.value })}
                         className="input w-full"
                       />
@@ -192,7 +255,7 @@ export default function UserManagement() {
                   <td className="py-3 px-4">
                     {editingUser === user.id ? (
                       <select
-                        value={user.role}
+                        value={editingUserData.role || 'user'}
                         onChange={(e) => handleUpdateUser(user.id, { role: e.target.value as 'admin' | 'manager' | 'user' })}
                         className="input w-full"
                         disabled={user.username === 'Camryn'}
@@ -214,7 +277,7 @@ export default function UserManagement() {
                     {editingUser === user.id ? (
                       <input
                         type="checkbox"
-                        checked={user.isActive}
+                        checked={editingUserData.isActive || false}
                         onChange={(e) => handleUpdateUser(user.id, { isActive: e.target.checked })}
                         className="w-4 h-4 text-blue-600"
                         disabled={user.username === 'Camryn'}
@@ -286,6 +349,82 @@ export default function UserManagement() {
                   </td>
                 </tr>
               ))}
+              
+              {/* Show new user row when adding */}
+              {editingUser && !users.find(u => u.id === editingUser) && (
+                <tr className="border-b border-gray-100 hover:bg-gray-50 bg-blue-50">
+                  <td className="py-3 px-4">
+                    <input
+                      type="text"
+                      value={editingUserData.name || ''}
+                      onChange={(e) => handleUpdateUser(editingUser, { name: e.target.value })}
+                      className="input w-full"
+                      placeholder="Enter name"
+                    />
+                  </td>
+                  <td className="py-3 px-4">
+                    <input
+                      type="text"
+                      value={editingUserData.username || ''}
+                      onChange={(e) => handleUpdateUser(editingUser, { username: e.target.value })}
+                      className="input w-full"
+                      placeholder="Enter username"
+                    />
+                  </td>
+                  <td className="py-3 px-4">
+                    <input
+                      type="email"
+                      value={editingUserData.email || ''}
+                      onChange={(e) => handleUpdateUser(editingUser, { email: e.target.value })}
+                      className="input w-full"
+                      placeholder="Enter email"
+                    />
+                  </td>
+                  <td className="py-3 px-4">
+                    <select
+                      value={editingUserData.role || 'user'}
+                      onChange={(e) => handleUpdateUser(editingUser, { role: e.target.value as 'admin' | 'manager' | 'user' })}
+                      className="input w-full"
+                    >
+                      <option value="user">User</option>
+                      <option value="manager">Manager</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                  </td>
+                  <td className="py-3 px-4">
+                    <input
+                      type="checkbox"
+                      checked={editingUserData.isActive || false}
+                      onChange={(e) => handleUpdateUser(editingUser, { isActive: e.target.checked })}
+                      className="w-4 h-4 text-blue-600"
+                    />
+                  </td>
+                  <td className="py-3 px-4">
+                    <div className="flex items-center space-x-2">
+                      <span className="px-2 py-1 rounded-full text-xs bg-orange-100 text-orange-800">
+                        Change Required
+                      </span>
+                    </div>
+                  </td>
+                  <td className="py-3 px-4">
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => handleSaveUser(editingUser)}
+                        disabled={!editingUserData.name || !editingUserData.username || !editingUserData.email}
+                        className="p-1 text-green-600 hover:text-green-800 disabled:text-gray-400"
+                      >
+                        <Check className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={handleCancelEdit}
+                        className="p-1 text-gray-600 hover:text-gray-800"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

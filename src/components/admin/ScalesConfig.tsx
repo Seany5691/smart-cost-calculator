@@ -25,10 +25,11 @@ export default function ScalesConfig() {
     setMessage(null);
 
     try {
-      updateScales(scalesData);
-      setMessage({ type: 'success', text: 'Scales configuration saved successfully!' });
+      await updateScales(scalesData);
+      setMessage({ type: 'success', text: 'Scales configuration saved successfully to Supabase!' });
     } catch (error) {
-      setMessage({ type: 'error', text: 'An error occurred while saving.' });
+      console.error('Error saving scales config:', error);
+      setMessage({ type: 'error', text: 'An error occurred while saving to Supabase. Please try again.' });
     } finally {
       setIsLoading(false);
     }
@@ -76,7 +77,7 @@ export default function ScalesConfig() {
           className="btn btn-success flex items-center space-x-2"
         >
           <Save className="w-4 h-4" />
-          <span>{isLoading ? 'Saving...' : 'Save Changes'}</span>
+          <span>{isLoading ? 'Saving to Supabase...' : 'Save Changes'}</span>
         </button>
       </div>
 
@@ -181,6 +182,7 @@ export default function ScalesConfig() {
           <li><strong>Finance Fees:</strong> Based on the total finance amount</li>
           <li><strong>Gross Profit:</strong> Base profit based on the number of extensions</li>
           <li><strong>Additional Costs:</strong> Distance and point-based costs</li>
+          <li><strong>Changes are saved to Supabase:</strong> All updates are persisted across browsers</li>
         </ul>
       </div>
     </div>

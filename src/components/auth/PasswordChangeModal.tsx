@@ -57,7 +57,7 @@ export default function PasswordChangeModal({ isOpen, onClose }: PasswordChangeM
     }
 
     try {
-      changePassword(user.id, newPassword);
+      await changePassword(user.id, newPassword);
       setSuccess(true);
       setTimeout(() => {
         onClose();

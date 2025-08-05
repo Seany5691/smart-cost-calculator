@@ -15,7 +15,7 @@ interface LayoutProps {
 export default function Layout({ children }: LayoutProps) {
   const { setOnlineStatus } = useOfflineStore();
   const { user } = useAuthStore();
-  const { loadFromAPI } = useConfigStore();
+  const { loadFromAPI, refreshFromSupabase } = useConfigStore();
   const [showPasswordModal, setShowPasswordModal] = useState(false);
 
   useEffect(() => {
@@ -36,38 +36,25 @@ export default function Layout({ children }: LayoutProps) {
 
   // Initialize config store and users on app load
   useEffect(() => {
-    loadFromAPI();
-    const { initializeUsers } = useAuthStore.getState();
-    initializeUsers();
+    const initializeApp = async () => {
+      await loadFromAPI();
+      const { initializeUsers } = useAuthStore.getState();
+      await initializeUsers();
+    };
+    initializeApp();
   }, [loadFromAPI]);
 
-  // Set up periodic sync and storage event listener
+  // Set up periodic sync from Supabase
   useEffect(() => {
-    // Sync every 60 seconds to ensure data consistency (reduced frequency)
+    // Refresh from Supabase every 30 seconds to ensure cross-browser consistency
     const syncInterval = setInterval(() => {
-      const configStore = useConfigStore.getState();
-      configStore.loadFromGlobalStorage();
-    }, 60000);
-
-    // Listen for storage changes from other tabs
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'smart-cost-calculator-global-config' && e.newValue) {
-        const configStore = useConfigStore.getState();
-        configStore.loadFromGlobalStorage();
-      }
-      if (e.key === 'smart-cost-calculator-global-users' && e.newValue) {
-        const authStore = useAuthStore.getState();
-        authStore.loadUsersFromGlobalStorage();
-      }
-    };
-
-    window.addEventListener('storage', handleStorageChange);
+      refreshFromSupabase();
+    }, 30000);
 
     return () => {
       clearInterval(syncInterval);
-      window.removeEventListener('storage', handleStorageChange);
     };
-  }, []);
+  }, [refreshFromSupabase]);
 
   // Show password change modal if user requires password change
   useEffect(() => {

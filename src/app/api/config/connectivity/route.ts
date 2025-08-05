@@ -1,17 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { promises as fs } from 'fs';
-import path from 'path';
+import { supabaseHelpers } from '@/lib/supabase';
 import { Item } from '@/lib/types';
-
-const configPath = path.join(process.cwd(), 'public', 'config', 'connectivity.json');
 
 export async function GET() {
   try {
-    const data = await fs.readFile(configPath, 'utf8');
-    const items = JSON.parse(data);
+    const items = await supabaseHelpers.getConnectivityItems();
     return NextResponse.json(items);
   } catch (error) {
-    console.error('Error reading connectivity config:', error);
+    console.error('Error reading connectivity config from Supabase:', error);
     return NextResponse.json({ error: 'Failed to read connectivity config' }, { status: 500 });
   }
 }
@@ -29,15 +25,20 @@ export async function POST(request: NextRequest) {
     const validatedItems = items.map(item => ({
       ...item,
       quantity: 0, // Reset quantities when saving
-      locked: item.locked || false
+      locked: item.locked || false,
+      isActive: true
     }));
 
-    // Write to file
-    await fs.writeFile(configPath, JSON.stringify(validatedItems, null, 2));
+    // Save to Supabase
+    const savedItems = await supabaseHelpers.updateConnectivityItems(validatedItems);
     
-    return NextResponse.json({ success: true, message: 'Connectivity config updated successfully' });
+    return NextResponse.json({ 
+      success: true, 
+      message: 'Connectivity config updated successfully',
+      data: savedItems
+    });
   } catch (error) {
-    console.error('Error writing connectivity config:', error);
+    console.error('Error writing connectivity config to Supabase:', error);
     return NextResponse.json({ error: 'Failed to update connectivity config' }, { status: 500 });
   }
 } 

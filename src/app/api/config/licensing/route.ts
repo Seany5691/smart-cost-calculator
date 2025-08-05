@@ -1,17 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { promises as fs } from 'fs';
-import path from 'path';
+import { supabaseHelpers } from '@/lib/supabase';
 import { Item } from '@/lib/types';
-
-const configPath = path.join(process.cwd(), 'public', 'config', 'licensing.json');
 
 export async function GET() {
   try {
-    const data = await fs.readFile(configPath, 'utf8');
-    const items = JSON.parse(data);
+    const items = await supabaseHelpers.getLicensingItems();
     return NextResponse.json(items);
   } catch (error) {
-    console.error('Error reading licensing config:', error);
+    console.error('Error reading licensing config from Supabase:', error);
     return NextResponse.json({ error: 'Failed to read licensing config' }, { status: 500 });
   }
 }
@@ -29,15 +25,20 @@ export async function POST(request: NextRequest) {
     const validatedItems = items.map(item => ({
       ...item,
       quantity: 0, // Reset quantities when saving
-      locked: item.locked || false
+      locked: item.locked || false,
+      isActive: true
     }));
 
-    // Write to file
-    await fs.writeFile(configPath, JSON.stringify(validatedItems, null, 2));
+    // Save to Supabase
+    const savedItems = await supabaseHelpers.updateLicensingItems(validatedItems);
     
-    return NextResponse.json({ success: true, message: 'Licensing config updated successfully' });
+    return NextResponse.json({ 
+      success: true, 
+      message: 'Licensing config updated successfully',
+      data: savedItems
+    });
   } catch (error) {
-    console.error('Error writing licensing config:', error);
+    console.error('Error writing licensing config to Supabase:', error);
     return NextResponse.json({ error: 'Failed to update licensing config' }, { status: 500 });
   }
 } 
