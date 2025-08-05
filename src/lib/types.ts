@@ -33,7 +33,6 @@ export interface DealDetails {
   term: number;
   escalation: number;
   distanceToInstall: number;
-  additionalGrossProfit: number;
   settlement: number;
 }
 
@@ -56,8 +55,6 @@ export interface TotalCosts {
   extensionCount: number;
   hardwareTotal: number;
   hardwareInstallTotal: number;
-  baseGrossProfit: number;
-  additionalProfit: number;
   totalGrossProfit: number;
   financeFee: number;
   settlementAmount: number;

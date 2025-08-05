@@ -327,7 +327,7 @@ export default function PDFGenerator({ onGenerate }: PDFGeneratorProps) {
         ['Distance to Install', `${dealDetails.distanceToInstall} KM`],
         ['Term', `${dealDetails.term} months`],
         ['Escalation Rate', `${dealDetails.escalation}%`],
-        ['Additional Gross Profit', formatCurrency(dealDetails.additionalGrossProfit)],
+        
         ['Settlement Amount', formatCurrency(dealDetails.settlement)]
       ];
 
@@ -399,10 +399,8 @@ export default function PDFGenerator({ onGenerate }: PDFGeneratorProps) {
         ['Total Monthly Recurring Costs', formatCurrency(totals.totalMRC)],
         ['', ''], // Empty row for spacing
         
-        // Profit & Finance Group
-        ['Base Gross Profit', formatCurrency(totals.baseGrossProfit)],
-        ['Additional Gross Profit', formatCurrency(totals.additionalProfit)],
-        ['Total Gross Profit', formatCurrency(totals.totalGrossProfit)],
+                 // Profit & Finance Group
+         ['Total Gross Profit', formatCurrency(totals.totalGrossProfit)],
         ['Finance Fee', formatCurrency(totals.financeFee)],
         ['Settlement Amount', formatCurrency(totals.settlementAmount)],
         ['', ''], // Empty row for spacing

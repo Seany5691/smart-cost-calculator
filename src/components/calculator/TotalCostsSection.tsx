@@ -14,11 +14,12 @@ interface TotalCostsSectionProps {
 }
 
 export default function TotalCostsSection({ onPrev }: TotalCostsSectionProps) {
-  const { calculateTotalCosts, dealDetails, saveDeal } = useCalculatorStore();
+  const { calculateTotalCosts, dealDetails, saveDeal, updateDealDetails } = useCalculatorStore();
   const { user } = useAuthStore();
   const { scales } = useConfigStore();
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [editableTotalGrossProfit, setEditableTotalGrossProfit] = useState<number | null>(null);
   const [totals, setTotals] = useState<TotalCosts>({
     extensionCount: 0,
     hardwareTotal: 0,
@@ -112,16 +113,25 @@ export default function TotalCostsSection({ onPrev }: TotalCostsSectionProps) {
                   <td className="py-2 text-sm text-gray-900 text-right font-medium">{formatCurrency(totals.hardwareInstallTotal)}</td>
                 </tr>
                 <tr>
-                  <td className="py-2 text-sm text-gray-600">Base Gross Profit</td>
-                  <td className="py-2 text-sm text-gray-900 text-right font-medium">{formatCurrency(totals.baseGrossProfit)}</td>
-                </tr>
-                <tr>
-                  <td className="py-2 text-sm text-gray-600">Additional Profit</td>
-                  <td className="py-2 text-sm text-gray-900 text-right font-medium">{formatCurrency(totals.additionalProfit)}</td>
-                </tr>
-                <tr>
                   <td className="py-2 text-sm text-gray-600">Total Gross Profit</td>
-                  <td className="py-2 text-sm text-gray-900 text-right font-medium">{formatCurrency(totals.totalGrossProfit)}</td>
+                  <td className="py-2 text-sm text-gray-900 text-right font-medium">
+                    <div className="flex items-center justify-end space-x-2">
+                      <input
+                        type="number"
+                        value={editableTotalGrossProfit !== null ? editableTotalGrossProfit : totals.totalGrossProfit}
+                        onChange={(e) => {
+                          const value = parseFloat(e.target.value) || 0;
+                          setEditableTotalGrossProfit(value);
+                          // Update the totals with the new value
+                          const newTotals = { ...totals, totalGrossProfit: value };
+                          setTotals(newTotals);
+                        }}
+                        className="w-24 text-right border border-gray-300 rounded px-2 py-1 text-sm"
+                        placeholder={formatCurrency(totals.totalGrossProfit)}
+                      />
+                      <span className="text-xs text-gray-500">(Default: {formatCurrency(totals.totalGrossProfit)})</span>
+                    </div>
+                  </td>
                 </tr>
                 <tr>
                   <td className="py-2 text-sm text-gray-600">Finance Fee</td>
@@ -209,10 +219,7 @@ export default function TotalCostsSection({ onPrev }: TotalCostsSectionProps) {
               <p className="font-semibold text-gray-700 text-sm">Distance to Install</p>
               <p className="text-gray-900">{dealDetails.distanceToInstall} km</p>
             </div>
-            <div>
-              <p className="font-semibold text-gray-700 text-sm">Additional Gross Profit</p>
-              <p className="text-gray-900">{formatCurrency(dealDetails.additionalGrossProfit)}</p>
-            </div>
+
             <div>
               <p className="font-semibold text-gray-700 text-sm">Settlement Amount</p>
               <p className="text-gray-900">{formatCurrency(dealDetails.settlement)}</p>

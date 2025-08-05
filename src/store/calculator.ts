@@ -9,7 +9,6 @@ const DEFAULT_DEAL_DETAILS: DealDetails = {
   term: 36,
   escalation: 0,
   distanceToInstall: 0,
-  additionalGrossProfit: 0,
   settlement: 0
 };
 
@@ -112,7 +111,7 @@ export const useCalculatorStore = create<CalculatorState>()(
             term: dealDetails.term,
             escalation: dealDetails.escalation,
             distanceToInstall: dealDetails.distanceToInstall,
-            additionalGrossProfit: dealDetails.additionalGrossProfit,
+
             settlement: dealDetails.settlement,
             sections,
             factors: configStore.factors,
@@ -157,8 +156,6 @@ export const useCalculatorStore = create<CalculatorState>()(
             extensionCount: 0,
             hardwareTotal: 0,
             hardwareInstallTotal: 0,
-            baseGrossProfit: 0,
-            additionalProfit: 0,
             totalGrossProfit: 0,
             financeFee: 0,
             settlementAmount: 0,
@@ -187,8 +184,6 @@ export const useCalculatorStore = create<CalculatorState>()(
             extensionCount: 0,
             hardwareTotal: 0,
             hardwareInstallTotal: 0,
-            baseGrossProfit: 0,
-            additionalProfit: 0,
             totalGrossProfit: 0,
             financeFee: 0,
             settlementAmount: 0,
@@ -251,8 +246,7 @@ export const useCalculatorStore = create<CalculatorState>()(
           (extensionCount * configStore.scales.additional_costs.cost_per_point) : 0;
 
         // Calculate totals
-        const additionalProfit = dealDetails.additionalGrossProfit;
-        const totalGrossProfit = baseGrossProfit + additionalProfit;
+        const totalGrossProfit = baseGrossProfit;
         const settlementAmount = dealDetails.settlement;
         const extensionCost = extensionCount * (configStore.scales?.additional_costs?.cost_per_point || 0);
         
@@ -286,8 +280,6 @@ export const useCalculatorStore = create<CalculatorState>()(
           extensionCount,
           hardwareTotal,
           hardwareInstallTotal: installationCost,
-          baseGrossProfit,
-          additionalProfit,
           totalGrossProfit,
           financeFee,
           settlementAmount,

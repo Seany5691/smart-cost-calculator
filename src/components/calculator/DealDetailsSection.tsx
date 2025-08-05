@@ -16,7 +16,6 @@ export default function DealDetailsSection({ onNext }: DealDetailsSectionProps) 
     term: dealDetails.term,
     escalation: dealDetails.escalation,
     distanceToInstall: dealDetails.distanceToInstall,
-    additionalGrossProfit: dealDetails.additionalGrossProfit,
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -26,7 +25,6 @@ export default function DealDetailsSection({ onNext }: DealDetailsSectionProps) 
       term: dealDetails.term,
       escalation: dealDetails.escalation,
       distanceToInstall: dealDetails.distanceToInstall,
-      additionalGrossProfit: dealDetails.additionalGrossProfit,
     });
   }, [dealDetails]);
 
@@ -58,9 +56,7 @@ export default function DealDetailsSection({ onNext }: DealDetailsSectionProps) 
       newErrors.distanceToInstall = 'Distance cannot be negative';
     }
 
-    if (formData.additionalGrossProfit < 0) {
-      newErrors.additionalGrossProfit = 'Additional gross profit cannot be negative';
-    }
+
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -168,28 +164,7 @@ export default function DealDetailsSection({ onNext }: DealDetailsSectionProps) 
           )}
         </div>
 
-        {/* Additional Gross Profit */}
-        <div className="form-group md:col-span-2">
-          <label htmlFor="additionalGrossProfit" className="label">
-            Additional Gross Profit (R)
-          </label>
-          <input
-            id="additionalGrossProfit"
-            type="number"
-            value={formData.additionalGrossProfit}
-            onChange={(e) => handleInputChange('additionalGrossProfit', parseFloat(e.target.value) || 0)}
-            className={`input ${errors.additionalGrossProfit ? 'border-red-500' : ''}`}
-            placeholder="Enter additional gross profit amount"
-            min="0"
-            step="0.01"
-          />
-          {errors.additionalGrossProfit && (
-            <p className="text-red-500 text-sm mt-1">{errors.additionalGrossProfit}</p>
-          )}
-          <p className="text-sm text-gray-500 mt-1">
-            This amount will be added to the base gross profit calculation
-          </p>
-        </div>
+
       </div>
 
       {/* Summary Card */}
