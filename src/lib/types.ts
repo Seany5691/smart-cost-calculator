@@ -34,6 +34,10 @@ export interface DealDetails {
   escalation: number;
   distanceToInstall: number;
   settlement: number;
+  settlementStartDate?: string;
+  settlementRentalAmount?: number;
+  settlementEscalationRate?: number;
+  settlementRentalType?: 'starting' | 'current';
 }
 
 export interface FactorData {

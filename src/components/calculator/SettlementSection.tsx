@@ -43,7 +43,13 @@ export default function SettlementSection({ onNext, onPrev }: SettlementSectionP
 
     setCalculations(newCalculations);
     setTotalSettlement(settlementAmount);
-    updateDealDetails({ settlement: settlementAmount });
+    updateDealDetails({ 
+      settlement: settlementAmount,
+      settlementStartDate: startDate,
+      settlementRentalAmount: rental,
+      settlementEscalationRate: escalation,
+      settlementRentalType: rentalType
+    });
   };
 
   // Toggle settlement on/off

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useCalculatorStore } from '@/store/calculator';
 import { useAuthStore } from '@/store/auth';
 import { useConfigStore } from '@/store/config';
@@ -8,6 +8,8 @@ import { formatCurrency, getFactorForDeal } from '@/lib/utils';
 import { TotalCosts } from '@/lib/types';
 import { ChevronLeft, Download, FileText, Printer } from 'lucide-react';
 import PDFGenerator from '../pdf/PDFGenerator';
+import ProposalModal, { ProposalData } from './ProposalModal';
+import ProposalGenerator, { ProposalGeneratorRef } from './ProposalGenerator';
 
 interface TotalCostsSectionProps {
   onPrev: () => void;
@@ -20,6 +22,8 @@ export default function TotalCostsSection({ onPrev }: TotalCostsSectionProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [editableTotalGrossProfit, setEditableTotalGrossProfit] = useState<number | null>(null);
+  const [isProposalModalOpen, setIsProposalModalOpen] = useState(false);
+  const proposalGeneratorRef = useRef<ProposalGeneratorRef>(null);
   const [totals, setTotals] = useState<TotalCosts>({
     extensionCount: 0,
     hardwareTotal: 0,
@@ -110,8 +114,15 @@ export default function TotalCostsSection({ onPrev }: TotalCostsSectionProps) {
   }, [calculateTotalsWithCustomGrossProfit, editableTotalGrossProfit, dealDetails]);
 
   const handleGenerateProposal = () => {
-    // TODO: Implement proposal generation
-    alert('Proposal generation will be implemented soon');
+    setIsProposalModalOpen(true);
+  };
+
+  const handleProposalGenerate = (proposalData: ProposalData) => {
+    setIsProposalModalOpen(false);
+    // Call the generateProposal function from ProposalGenerator
+    if (proposalGeneratorRef.current) {
+      proposalGeneratorRef.current.generateProposal(proposalData);
+    }
   };
 
   const handleGenerateDealPack = () => {
@@ -363,7 +374,7 @@ export default function TotalCostsSection({ onPrev }: TotalCostsSectionProps) {
           <PDFGenerator />
           <button
             onClick={handleGenerateProposal}
-            className="btn btn-secondary flex items-center space-x-2"
+            className="btn btn-primary flex items-center space-x-2"
           >
             <FileText className="w-4 h-4" />
             <span>Generate Proposal</span>
@@ -377,6 +388,16 @@ export default function TotalCostsSection({ onPrev }: TotalCostsSectionProps) {
           </button>
         </div>
       </div>
+
+      {/* Proposal Modal */}
+      <ProposalModal
+        isOpen={isProposalModalOpen}
+        onClose={() => setIsProposalModalOpen(false)}
+        onGenerate={handleProposalGenerate}
+      />
+
+      {/* Proposal Generator */}
+      <ProposalGenerator ref={proposalGeneratorRef} />
     </div>
   );
 } 
