@@ -5,6 +5,7 @@ import { useCalculatorStore } from '@/store/calculator';
 import { useConfigStore } from '@/store/config';
 import { formatCurrency } from '@/lib/utils';
 import { ProposalData } from './ProposalModal';
+import { TotalCosts } from '@/lib/types';
 import { CheckCircle, AlertCircle } from 'lucide-react';
 
 interface ProposalGeneratorProps {
@@ -12,7 +13,7 @@ interface ProposalGeneratorProps {
 }
 
 export interface ProposalGeneratorRef {
-  generateProposal: (data: ProposalData) => Promise<void>;
+  generateProposal: (data: ProposalData, customTotals?: TotalCosts) => Promise<void>;
 }
 
 const ProposalGenerator = forwardRef<ProposalGeneratorRef, ProposalGeneratorProps>(({ onGenerate }, ref) => {
@@ -27,7 +28,7 @@ const ProposalGenerator = forwardRef<ProposalGeneratorRef, ProposalGeneratorProp
   });
 
   useImperativeHandle(ref, () => ({
-    generateProposal: async (proposalData: ProposalData) => {
+    generateProposal: async (proposalData: ProposalData, customTotals?: TotalCosts) => {
       try {
         setIsGenerating(true);
         
@@ -44,7 +45,8 @@ const ProposalGenerator = forwardRef<ProposalGeneratorRef, ProposalGeneratorProp
         const pdfDoc = await PDFDocument.load(pdfBytes);
         const form = pdfDoc.getForm();
 
-        const totals = calculateTotalCosts();
+        // Use custom totals if provided, otherwise fall back to calculated totals
+        const totals = customTotals || calculateTotalCosts();
         const currentYear = new Date().getFullYear();
 
         // Calculate current hardware rental from settlement details
@@ -70,8 +72,8 @@ const ProposalGenerator = forwardRef<ProposalGeneratorRef, ProposalGeneratorProp
         }
 
         // Calculate projections
-        const currentEscalation = dealDetails.escalation / 100;
-        const newEscalation = dealDetails.escalation / 100;
+        const currentEscalation = (dealDetails.settlementEscalationRate || 0) / 100; // Use settlement escalation rate for current projections
+        const newEscalation = dealDetails.escalation / 100; // Use new deal escalation rate for new projections
         const contractYears = Math.ceil(dealDetails.term / 12);
 
         // Current projections (current rental + current MRC + escalation)

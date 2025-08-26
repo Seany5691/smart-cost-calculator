@@ -6,15 +6,17 @@ import { useAuthStore } from '@/store/auth';
 import { useConfigStore } from '@/store/config';
 import { formatCurrency } from '@/lib/utils';
 import { FileText, CheckCircle, AlertCircle } from 'lucide-react';
+import { TotalCosts } from '@/lib/types';
 
 // Type for color arrays to fix TypeScript errors
 type RGBColor = [number, number, number];
 
 interface PDFGeneratorProps {
   onGenerate?: () => void;
+  customTotals?: TotalCosts;
 }
 
-export default function PDFGenerator({ onGenerate }: PDFGeneratorProps) {
+export default function PDFGenerator({ onGenerate, customTotals }: PDFGeneratorProps) {
   const { sections, dealDetails, calculateTotalCosts } = useCalculatorStore();
   const { user } = useAuthStore();
   const { scales } = useConfigStore();
@@ -44,7 +46,8 @@ export default function PDFGenerator({ onGenerate }: PDFGeneratorProps) {
       const { default: jsPDF } = await import('jspdf');
       const { default: autoTable } = await import('jspdf-autotable');
       
-      const totals = calculateTotalCosts();
+      // Use custom totals if provided, otherwise fall back to calculated totals
+      const totals = customTotals || calculateTotalCosts();
       const doc = new jsPDF();
       let yPos = 35; // Starting position for content
       const leftMargin = 25; // Consistent margins

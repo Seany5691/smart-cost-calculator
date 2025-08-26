@@ -119,9 +119,9 @@ export default function TotalCostsSection({ onPrev }: TotalCostsSectionProps) {
 
   const handleProposalGenerate = (proposalData: ProposalData) => {
     setIsProposalModalOpen(false);
-    // Call the generateProposal function from ProposalGenerator
+    // Call the generateProposal function from ProposalGenerator with custom totals
     if (proposalGeneratorRef.current) {
-      proposalGeneratorRef.current.generateProposal(proposalData);
+      proposalGeneratorRef.current.generateProposal(proposalData, totals);
     }
   };
 
@@ -371,7 +371,8 @@ export default function TotalCostsSection({ onPrev }: TotalCostsSectionProps) {
             <Download className="w-4 h-4" />
             <span>{isSaving ? 'Saving...' : 'Save Deal'}</span>
           </button>
-          <PDFGenerator />
+          {/* PDF Generator - pass custom totals */}
+          <PDFGenerator customTotals={totals} />
           <button
             onClick={handleGenerateProposal}
             className="btn btn-primary flex items-center space-x-2"
