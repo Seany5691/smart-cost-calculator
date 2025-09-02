@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useConfigStore } from '@/store/config';
 import { Item } from '@/lib/types';
 import { formatCurrency, generateId } from '@/lib/utils';
-import { Plus, Trash2, Edit, Save, X, Check } from 'lucide-react';
+import { Plus, Trash2, Edit, Save, X, Check, ChevronUp, ChevronDown } from 'lucide-react';
 
 export default function LicensingConfig() {
   const { licensing, updateLicensing } = useConfigStore();
@@ -40,7 +40,8 @@ export default function LicensingConfig() {
       managerCost: 0,
       userCost: 0,
       quantity: 0,
-      locked: false
+      locked: false,
+      displayOrder: items.length
     };
     setItems([...items, newItem]);
     setEditingItem(newItem.id);
@@ -66,6 +67,27 @@ export default function LicensingConfig() {
 
   const handleSaveItem = (id: string) => {
     setEditingItem(null);
+  };
+
+  const handleMoveItem = (id: string, direction: 'up' | 'down') => {
+    const currentIndex = items.findIndex(item => item.id === id);
+    if (currentIndex === -1) return;
+
+    const newItems = [...items];
+    if (direction === 'up' && currentIndex > 0) {
+      // Swap with previous item
+      [newItems[currentIndex], newItems[currentIndex - 1]] = [newItems[currentIndex - 1], newItems[currentIndex]];
+    } else if (direction === 'down' && currentIndex < newItems.length - 1) {
+      // Swap with next item
+      [newItems[currentIndex], newItems[currentIndex + 1]] = [newItems[currentIndex + 1], newItems[currentIndex]];
+    }
+
+    // Update display order values
+    newItems.forEach((item, index) => {
+      item.displayOrder = index;
+    });
+
+    setItems(newItems);
   };
 
   return (
@@ -94,6 +116,7 @@ export default function LicensingConfig() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-200">
+                <th className="text-left py-3 px-4 font-semibold">Order</th>
                 <th className="text-left py-3 px-4 font-semibold">Name</th>
                 <th className="text-left py-3 px-4 font-semibold">Cost</th>
                 <th className="text-left py-3 px-4 font-semibold">Manager Cost</th>
@@ -103,8 +126,29 @@ export default function LicensingConfig() {
               </tr>
             </thead>
             <tbody>
-              {items.map((item) => (
+              {items.map((item, index) => (
                 <tr key={item.id} className="border-b border-gray-100 hover:bg-gray-50">
+                  <td className="py-3 px-4">
+                    <div className="flex items-center space-x-1">
+                      <span className="text-sm text-gray-600 font-medium">{index + 1}</span>
+                      <div className="flex flex-col">
+                        <button
+                          onClick={() => handleMoveItem(item.id, 'up')}
+                          disabled={index === 0}
+                          className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30"
+                        >
+                          <ChevronUp className="w-3 h-3" />
+                        </button>
+                        <button
+                          onClick={() => handleMoveItem(item.id, 'down')}
+                          disabled={index === items.length - 1}
+                          className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30"
+                        >
+                          <ChevronDown className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+                  </td>
                   <td className="py-3 px-4">
                     {editingItem === item.id ? (
                       <input

@@ -33,8 +33,21 @@ export default function DealsPage() {
 
   const loadDeals = useCallback(async () => {
     try {
-      // Load deals from localStorage instead of API
-      const allDeals = JSON.parse(localStorage.getItem('deals-storage') || '[]');
+      // Load deals from localStorage with better error handling
+      const dealsStorage = localStorage.getItem('deals-storage');
+      console.log('Raw deals storage:', dealsStorage);
+      
+      let allDeals = [];
+      if (dealsStorage) {
+        try {
+          allDeals = JSON.parse(dealsStorage);
+        } catch (parseError) {
+          console.error('Error parsing deals storage:', parseError);
+          allDeals = [];
+        }
+      }
+      
+      console.log('All deals loaded:', allDeals);
       
       // Filter deals based on user role
       let userDeals: Deal[] = [];
@@ -46,6 +59,7 @@ export default function DealsPage() {
         userDeals = allDeals.filter((deal: Deal) => deal.userId === user?.id);
       }
       
+      console.log('Filtered deals for user:', userDeals);
       setDeals(userDeals);
     } catch (error) {
       console.error('Error loading deals:', error);

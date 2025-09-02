@@ -29,41 +29,41 @@ interface ConfigState {
 
 // Default configurations
 const DEFAULT_HARDWARE: Item[] = [
-  { id: "hw1", name: "Desk Phone B&W", cost: 1054, quantity: 0, isExtension: true },
-  { id: "hw2", name: "Desk Phone Colour", cost: 1378, quantity: 0, isExtension: true },
-  { id: "hw3", name: "Switchboard Colour", cost: 2207, quantity: 0, isExtension: true },
-  { id: "hw4", name: "Cordless Phone", cost: 2420, quantity: 0, isExtension: true },
-  { id: "hw5", name: "Bluetooth Headset Mono", cost: 1996, quantity: 0, isExtension: false },
-  { id: "hw6", name: "Bluetooth Headset Dual", cost: 2340, quantity: 0, isExtension: false },
-  { id: "hw7", name: "Corded Headset Dual", cost: 1467, quantity: 0, isExtension: false },
-  { id: "hw8", name: "Cellphone", cost: 7500, quantity: 0, isExtension: false },
-  { id: "hw9", name: "4 Port PoE", cost: 644, quantity: 0, isExtension: false },
-  { id: "hw10", name: "8 Port PoE", cost: 813, quantity: 0, isExtension: false },
-  { id: "hw11", name: "16 Port PoE", cost: 2282, quantity: 0, isExtension: false },
-  { id: "hw12", name: "8 Port Managed PoE", cost: 1657, quantity: 0, isExtension: false },
-  { id: "hw13", name: "16 Port Managed PoE", cost: 2994, quantity: 0, isExtension: false },
-  { id: "hw14", name: "Access Point Gigabit", cost: 1350, quantity: 0, isExtension: false },
-  { id: "hw15", name: "Cloud Router WAN2", cost: 1613, quantity: 0, isExtension: false },
-  { id: "hw16", name: "5G/LTE Router", cost: 1800, quantity: 0, isExtension: false },
-  { id: "hw17", name: "PC", cost: 9000, quantity: 0, isExtension: false },
-  { id: "hw18", name: "A4 Copier", cost: 17000, quantity: 0, isExtension: false },
-  { id: "hw19", name: "Server Cabinet", cost: 1466.25, quantity: 0, isExtension: false },
-  { id: "hw20", name: "Additional Mobile App", cost: 0, quantity: 0, isExtension: false },
-  { id: "hw21", name: "Additional App on Own Device", cost: 0, quantity: 0, isExtension: false },
-  { id: "hw22", name: "Number Porting Per Number", cost: 200, quantity: 0, isExtension: false }
+  { id: "hw1", name: "Desk Phone B&W", cost: 1054, quantity: 0, isExtension: true, displayOrder: 0 },
+  { id: "hw2", name: "Desk Phone Colour", cost: 1378, quantity: 0, isExtension: true, displayOrder: 1 },
+  { id: "hw3", name: "Switchboard Colour", cost: 2207, quantity: 0, isExtension: true, displayOrder: 2 },
+  { id: "hw4", name: "Cordless Phone", cost: 2420, quantity: 0, isExtension: true, displayOrder: 3 },
+  { id: "hw5", name: "Bluetooth Headset Mono", cost: 1996, quantity: 0, isExtension: false, displayOrder: 4 },
+  { id: "hw6", name: "Bluetooth Headset Dual", cost: 2340, quantity: 0, isExtension: false, displayOrder: 5 },
+  { id: "hw7", name: "Corded Headset Dual", cost: 1467, quantity: 0, isExtension: false, displayOrder: 6 },
+  { id: "hw8", name: "Cellphone", cost: 7500, quantity: 0, isExtension: false, displayOrder: 7 },
+  { id: "hw9", name: "4 Port PoE", cost: 644, quantity: 0, isExtension: false, displayOrder: 8 },
+  { id: "hw10", name: "8 Port PoE", cost: 813, quantity: 0, isExtension: false, displayOrder: 9 },
+  { id: "hw11", name: "16 Port PoE", cost: 2282, quantity: 0, isExtension: false, displayOrder: 10 },
+  { id: "hw12", name: "8 Port Managed PoE", cost: 1657, quantity: 0, isExtension: false, displayOrder: 11 },
+  { id: "hw13", name: "16 Port Managed PoE", cost: 2994, quantity: 0, isExtension: false, displayOrder: 12 },
+  { id: "hw14", name: "Access Point Gigabit", cost: 1350, quantity: 0, isExtension: false, displayOrder: 13 },
+  { id: "hw15", name: "Cloud Router WAN2", cost: 1613, quantity: 0, isExtension: false, displayOrder: 14 },
+  { id: "hw16", name: "5G/LTE Router", cost: 1800, quantity: 0, isExtension: false, displayOrder: 15 },
+  { id: "hw17", name: "PC", cost: 9000, quantity: 0, isExtension: false, displayOrder: 16 },
+  { id: "hw18", name: "A4 Copier", cost: 17000, quantity: 0, isExtension: false, displayOrder: 17 },
+  { id: "hw19", name: "Server Cabinet", cost: 1466.25, quantity: 0, isExtension: false, displayOrder: 18 },
+  { id: "hw20", name: "Additional Mobile App", cost: 0, quantity: 0, isExtension: false, displayOrder: 19 },
+  { id: "hw21", name: "Additional App on Own Device", cost: 0, quantity: 0, isExtension: false, displayOrder: 20 },
+  { id: "hw22", name: "Number Porting Per Number", cost: 200, quantity: 0, isExtension: false, displayOrder: 21 }
 ];
 
 const DEFAULT_CONNECTIVITY: Item[] = [
-  { id: "conn1", name: "LTE", cost: 599, quantity: 0 },
-  { id: "conn2", name: "Fibre", cost: 599, quantity: 0 },
-  { id: "conn3", name: "Melon Sim Card", cost: 350, quantity: 0 }
+  { id: "conn1", name: "LTE", cost: 599, quantity: 0, displayOrder: 0 },
+  { id: "conn2", name: "Fibre", cost: 599, quantity: 0, displayOrder: 1 },
+  { id: "conn3", name: "Melon Sim Card", cost: 350, quantity: 0, displayOrder: 2 }
 ];
 
 const DEFAULT_LICENSING: Item[] = [
-  { id: "lic1", name: "Premium License", cost: 90, quantity: 0 },
-  { id: "lic2", name: "Service Level Agreement (0 - 5 users)", cost: 299, quantity: 0 },
-  { id: "lic3", name: "Service Level Agreement (6 - 10 users)", cost: 399, quantity: 0 },
-  { id: "lic4", name: "Service Level Agreement (11 users or more)", cost: 499, quantity: 0 }
+  { id: "lic1", name: "Premium License", cost: 90, quantity: 0, displayOrder: 0 },
+  { id: "lic2", name: "Service Level Agreement (0 - 5 users)", cost: 299, quantity: 0, displayOrder: 1 },
+  { id: "lic3", name: "Service Level Agreement (6 - 10 users)", cost: 399, quantity: 0, displayOrder: 2 },
+  { id: "lic4", name: "Service Level Agreement (11 users or more)", cost: 499, quantity: 0, displayOrder: 3 }
 ];
 
 const DEFAULT_FACTORS: FactorData = {
@@ -415,7 +415,13 @@ export const useConfigStore = create<ConfigState>()(
             try {
               const apiHardware = await hardwareRes.value.json();
               if (Array.isArray(apiHardware) && apiHardware.length > 0) {
-                hardware = apiHardware;
+                // Sort by displayOrder, then by name
+                hardware = apiHardware.sort((a, b) => {
+                  const orderA = a.displayOrder ?? 0;
+                  const orderB = b.displayOrder ?? 0;
+                  if (orderA !== orderB) return orderA - orderB;
+                  return a.name.localeCompare(b.name);
+                });
               }
             } catch (e) {
               console.warn('Invalid hardware data from Supabase API, using defaults');
@@ -426,7 +432,13 @@ export const useConfigStore = create<ConfigState>()(
             try {
               const apiConnectivity = await connectivityRes.value.json();
               if (Array.isArray(apiConnectivity) && apiConnectivity.length > 0) {
-                connectivity = apiConnectivity;
+                // Sort by displayOrder, then by name
+                connectivity = apiConnectivity.sort((a, b) => {
+                  const orderA = a.displayOrder ?? 0;
+                  const orderB = b.displayOrder ?? 0;
+                  if (orderA !== orderB) return orderA - orderB;
+                  return a.name.localeCompare(b.name);
+                });
               }
             } catch (e) {
               console.warn('Invalid connectivity data from Supabase API, using defaults');
@@ -437,7 +449,13 @@ export const useConfigStore = create<ConfigState>()(
             try {
               const apiLicensing = await licensingRes.value.json();
               if (Array.isArray(apiLicensing) && apiLicensing.length > 0) {
-                licensing = apiLicensing;
+                // Sort by displayOrder, then by name
+                licensing = apiLicensing.sort((a, b) => {
+                  const orderA = a.displayOrder ?? 0;
+                  const orderB = b.displayOrder ?? 0;
+                  if (orderA !== orderB) return orderA - orderB;
+                  return a.name.localeCompare(b.name);
+                });
               }
             } catch (e) {
               console.warn('Invalid licensing data from Supabase API, using defaults');

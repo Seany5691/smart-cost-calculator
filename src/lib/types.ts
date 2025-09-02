@@ -20,6 +20,7 @@ export interface Item {
   quantity: number;
   locked?: boolean;
   isExtension?: boolean;
+  displayOrder?: number;
 }
 
 export interface Section {
@@ -93,11 +94,14 @@ export interface AuthState {
 export interface CalculatorState {
   sections: Section[];
   dealDetails: DealDetails;
+  originalUserContext: { role: string; username: string } | null;
   initializeStore: () => Promise<void>;
   updateSectionItem: (sectionId: string, itemId: string, updates: Partial<Item>) => void;
   addTemporaryItem: (sectionId: string, item: Item) => void;
   updateDealDetails: (updates: Partial<DealDetails>) => void;
   saveDeal: () => Promise<boolean>;
+  loadDeal: (dealId: string) => Promise<any>;
+  resetDeal: () => void;
   calculateTotalCosts: () => TotalCosts;
 }
 

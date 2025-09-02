@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth';
-import { Calculator, Calendar, User, DollarSign, ArrowRight, Plus, FileText, Users, ChevronRight } from 'lucide-react';
+import { Calculator, Calendar, User, DollarSign, ArrowRight, Plus, FileText, Users, Shield } from 'lucide-react';
 import Link from 'next/link';
 
 interface Deal {
@@ -15,7 +15,6 @@ interface Deal {
   term: number;
   escalation: number;
   distanceToInstall: number;
-  additionalGrossProfit: number;
   settlement: number;
   sections: Record<string, unknown>[];
   factors: Record<string, unknown>;
@@ -25,40 +24,34 @@ interface Deal {
   updatedAt: string;
 }
 
-interface UserDeals {
-  userId: string;
-  username: string;
-  userRole: string;
-  deals: Deal[];
-}
-
 export default function AdminDealsPage() {
-  const [userDeals, setUserDeals] = useState<UserDeals[]>([]);
+  const [deals, setDeals] = useState<Deal[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [filteredDeals, setFilteredDeals] = useState<Deal[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedUser, setSelectedUser] = useState<string>('all');
   const { user, checkAuth } = useAuthStore();
   const router = useRouter();
 
   const loadDeals = useCallback(async () => {
     try {
-      // Load deals from localStorage instead of API
-      const allDeals: Deal[] = JSON.parse(localStorage.getItem('deals-storage') || '[]');
+      // Load deals from localStorage with better error handling
+      const dealsStorage = localStorage.getItem('deals-storage');
+      console.log('Raw deals storage:', dealsStorage);
       
-      // Group deals by user
-      const dealsByUser: { [key: string]: UserDeals } = {};
-      
-      allDeals.forEach((deal) => {
-        if (!dealsByUser[deal.userId]) {
-          dealsByUser[deal.userId] = {
-            userId: deal.userId,
-            username: deal.username,
-            userRole: deal.userRole,
-            deals: []
-          };
+      let allDeals = [];
+      if (dealsStorage) {
+        try {
+          allDeals = JSON.parse(dealsStorage);
+        } catch (parseError) {
+          console.error('Error parsing deals storage:', parseError);
+          allDeals = [];
         }
-        dealsByUser[deal.userId].deals.push(deal);
-      });
+      }
       
-      setUserDeals(Object.values(dealsByUser));
+      console.log('Loaded deals:', allDeals);
+      setDeals(allDeals);
+      setFilteredDeals(allDeals);
     } catch (error) {
       console.error('Error loading deals:', error);
     } finally {
@@ -67,7 +60,13 @@ export default function AdminDealsPage() {
   }, []);
 
   useEffect(() => {
-    if (!checkAuth() || user?.role !== 'admin') {
+    if (!checkAuth()) {
+      router.push('/login');
+      return;
+    }
+
+    // Only allow admin access
+    if (user?.role !== 'admin') {
       router.push('/');
       return;
     }
@@ -75,15 +74,26 @@ export default function AdminDealsPage() {
     loadDeals();
   }, [checkAuth, router, loadDeals, user?.role]);
 
-  const toggleUserExpanded = (userId: string) => {
-    const newExpanded = new Set(expandedUsers);
-    if (newExpanded.has(userId)) {
-      newExpanded.delete(userId);
-    } else {
-      newExpanded.add(userId);
+  // Filter deals based on search term and selected user
+  useEffect(() => {
+    let filtered = deals;
+
+    // Filter by user
+    if (selectedUser !== 'all') {
+      filtered = filtered.filter(deal => deal.userId === selectedUser);
     }
-    setExpandedUsers(newExpanded);
-  };
+
+    // Filter by search term
+    if (searchTerm) {
+      filtered = filtered.filter(deal => 
+        deal.customerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        deal.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        deal.id.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    setFilteredDeals(filtered);
+  }, [deals, searchTerm, selectedUser]);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-GB', {
@@ -102,6 +112,16 @@ export default function AdminDealsPage() {
     }).format(amount);
   };
 
+  // Get unique users for filter
+  const uniqueUsers = Array.from(new Set(deals.map(deal => deal.userId))).map(userId => {
+    const userDeal = deals.find(deal => deal.userId === userId);
+    return {
+      id: userId,
+      username: userDeal?.username || 'Unknown User',
+      role: userDeal?.userRole || 'user'
+    };
+  });
+
   if (!user || user.role !== 'admin') {
     return null;
   }
@@ -110,15 +130,91 @@ export default function AdminDealsPage() {
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold gradient-text mb-2">All Deal Calculations</h1>
-        <p className="text-gray-600">View all deal calculations across all users</p>
+        <p className="text-gray-600">View and manage all deal calculations from all users</p>
       </div>
 
-      <div className="flex items-center space-x-2 mb-6">
-        <Users className="w-5 h-5 text-gray-400" />
-        <span className="text-sm text-gray-500">
-          {userDeals.length} user{userDeals.length !== 1 ? 's' : ''} • 
-          {userDeals.reduce((total, user) => total + user.deals.length, 0)} total deals
-        </span>
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div className="card">
+          <div className="flex items-center">
+            <div className="p-3 rounded-lg bg-blue-500 text-white">
+              <FileText className="w-6 h-6" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Total Deals</p>
+              <p className="text-2xl font-bold text-gray-900">{deals.length}</p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="card">
+          <div className="flex items-center">
+            <div className="p-3 rounded-lg bg-green-500 text-white">
+              <Users className="w-6 h-6" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Active Users</p>
+              <p className="text-2xl font-bold text-gray-900">{uniqueUsers.length}</p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="card">
+          <div className="flex items-center">
+            <div className="p-3 rounded-lg bg-purple-500 text-white">
+              <DollarSign className="w-6 h-6" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Total Value</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {formatCurrency(deals.reduce((sum, deal) => sum + (deal.totals?.totalPayout || 0), 0))}
+              </p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="card">
+          <div className="flex items-center">
+            <div className="p-3 rounded-lg bg-orange-500 text-white">
+              <Shield className="w-6 h-6" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Admin Access</p>
+              <p className="text-2xl font-bold text-gray-900">Full</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="card mb-6">
+        <div className="flex flex-col md:flex-row gap-4">
+          <div className="flex-1">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Search Deals</label>
+            <input
+              type="text"
+              placeholder="Search by customer name, username, or deal ID..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div className="md:w-64">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Filter by User</label>
+            <select
+              value={selectedUser}
+              onChange={(e) => setSelectedUser(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">All Users</option>
+              {uniqueUsers.map(user => (
+                <option key={user.id} value={user.id}>
+                  {user.username} ({user.role})
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
       </div>
 
       {isLoading ? (
@@ -126,99 +222,74 @@ export default function AdminDealsPage() {
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-500">Loading all deals...</p>
         </div>
-      ) : userDeals.length === 0 ? (
+      ) : filteredDeals.length === 0 ? (
         <div className="text-center py-12">
           <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">No deals found</h3>
-          <p className="text-gray-500">No users have calculated any deals yet</p>
+          <p className="text-gray-500 mb-4">
+            {searchTerm || selectedUser !== 'all' 
+              ? 'Try adjusting your search criteria' 
+              : 'No deals have been calculated yet'
+            }
+          </p>
+          {!searchTerm && selectedUser === 'all' && (
+            <Link href="/calculator" className="btn btn-primary inline-flex items-center space-x-2">
+              <Calculator className="w-4 h-4" />
+              <span>Start First Deal</span>
+            </Link>
+          )}
         </div>
       ) : (
-        <div className="space-y-6">
-          {userDeals.map((userDeal) => (
-            <div key={userDeal.userId} className="card">
-              <div 
-                className="p-4 cursor-pointer hover:bg-gray-50 transition-colors duration-200"
-                onClick={() => toggleUserExpanded(userDeal.userId)}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                      <User className="w-5 h-5 text-white" />
-                    </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredDeals.map((deal) => (
+            <div key={deal.id} className="card hover:shadow-lg transition-shadow duration-200">
+              <div className="p-6">
+                <div className="flex items-start justify-between mb-4">
                     <div>
-                      <h3 className="font-semibold text-gray-900">{userDeal.username}</h3>
-                      <p className="text-sm text-gray-500 capitalize">{userDeal.userRole}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-4">
-                    <div className="text-right">
-                      <p className="text-sm font-medium text-gray-900">{userDeal.deals.length}</p>
-                      <p className="text-xs text-gray-500">deals</p>
-                    </div>
-                    <ChevronRight 
-                      className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${
-                        expandedUsers.has(userDeal.userId) ? 'rotate-90' : ''
-                      }`} 
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {expandedUsers.has(userDeal.userId) && (
-                <div className="border-t border-gray-200 p-4">
-                  {userDeal.deals.length === 0 ? (
-                    <p className="text-gray-500 text-center py-4">No deals for this user</p>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {userDeal.deals.map((deal) => (
-                        <div key={deal.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow duration-200">
-                          <div className="flex items-start justify-between mb-3">
-                            <div>
-                              <h4 className="font-medium text-gray-900 mb-1">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-1">
                                 {deal.customerName || 'Unnamed Deal'}
-                              </h4>
-                              <p className="text-xs text-gray-500">Deal #{deal.id.slice(-6)}</p>
+                    </h3>
+                    <p className="text-sm text-gray-500">Deal #{deal.id.slice(-6)}</p>
                             </div>
                             <div className="text-right">
                               <p className="text-sm font-medium text-gray-900">
                                 {formatCurrency(deal.totals?.totalPayout || 0)}
                               </p>
-                              <p className="text-xs text-gray-500">Total</p>
+                    <p className="text-xs text-gray-500">Total Payout</p>
                             </div>
                           </div>
 
-                          <div className="space-y-1 mb-3">
-                            <div className="flex items-center text-xs text-gray-600">
-                              <Calendar className="w-3 h-3 mr-1" />
+                <div className="space-y-2 mb-4">
+                  <div className="flex items-center text-sm text-gray-600">
+                    <User className="w-4 h-4 mr-2" />
+                    <span>{deal.username} ({deal.userRole})</span>
+                  </div>
+                  <div className="flex items-center text-sm text-gray-600">
+                    <Calendar className="w-4 h-4 mr-2" />
                               <span>{deal.term} months</span>
                             </div>
-                            <div className="flex items-center text-xs text-gray-600">
-                              <DollarSign className="w-3 h-3 mr-1" />
+                  <div className="flex items-center text-sm text-gray-600">
+                    <DollarSign className="w-4 h-4 mr-2" />
                               <span>{deal.escalation}% escalation</span>
                             </div>
-                            <div className="flex items-center text-xs text-gray-600">
-                              <User className="w-3 h-3 mr-1" />
+                  <div className="flex items-center text-sm text-gray-600">
+                    <Calculator className="w-4 h-4 mr-2" />
                               <span>{deal.totals?.extensionCount || 0} extensions</span>
                             </div>
                           </div>
 
-                          <div className="text-xs text-gray-500 mb-3">
-                            {formatDate(deal.createdAt)}
+                <div className="text-xs text-gray-500 mb-4">
+                  Created: {formatDate(deal.createdAt)}
                           </div>
 
                           <Link 
-                            href={`/calculator?dealId=${deal.id}`}
-                            className="btn btn-outline btn-sm w-full flex items-center justify-center space-x-1"
+                  href={`/calculator?dealId=${deal.id}&viewAsAdmin=true`}
+                  className="btn btn-outline w-full flex items-center justify-center space-x-2"
                           >
-                            <ArrowRight className="w-3 h-3" />
-                            <span>Continue</span>
+                  <ArrowRight className="w-4 h-4" />
+                  <span>View Deal</span>
                           </Link>
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
           ))}
         </div>

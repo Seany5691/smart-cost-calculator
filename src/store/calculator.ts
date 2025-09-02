@@ -17,6 +17,7 @@ export const useCalculatorStore = create<CalculatorState>()(
     (set, get) => ({
       sections: [],
       dealDetails: DEFAULT_DEAL_DETAILS,
+      originalUserContext: null as { role: string; username: string } | null,
 
       initializeStore: async () => {
         console.log('Initializing calculator store...');
@@ -133,6 +134,45 @@ export const useCalculatorStore = create<CalculatorState>()(
         }
       },
 
+      loadDeal: async (dealId: string) => {
+        try {
+          const allDeals = JSON.parse(localStorage.getItem('deals-storage') || '[]');
+          const deal = allDeals.find((d: any) => d.id === dealId);
+          
+          if (!deal) {
+            throw new Error('Deal not found');
+          }
+
+          // Load deal data into the store
+          set((state) => ({
+            sections: deal.sections,
+            dealDetails: {
+              customerName: deal.customerName,
+              term: deal.term,
+              escalation: deal.escalation,
+              distanceToInstall: deal.distanceToInstall,
+              settlement: deal.settlement
+            },
+            originalUserContext: {
+              role: deal.userRole,
+              username: deal.username
+            }
+          }));
+
+          return deal;
+        } catch (error) {
+          console.error('Error loading deal:', error);
+          throw error;
+        }
+      },
+
+      resetDeal: () => {
+        set((state) => ({
+          dealDetails: DEFAULT_DEAL_DETAILS,
+          originalUserContext: null
+        }));
+      },
+
       calculateTotalCosts: (): TotalCosts => {
         const { sections, dealDetails } = get();
         const configStore = useConfigStore.getState();
@@ -174,10 +214,13 @@ export const useCalculatorStore = create<CalculatorState>()(
         // Get user role from localStorage (auth store is not available in this context)
         const user = typeof window !== 'undefined' ? 
           JSON.parse(localStorage.getItem('auth-storage') || '{}')?.state?.user : null;
-        const userRole: 'admin' | 'manager' | 'user' = user?.role || 'user';
+        
+        // Use original user context if available (for admin viewing other users' deals)
+        const { originalUserContext } = get();
+        const userRole: 'admin' | 'manager' | 'user' = originalUserContext?.role as 'admin' | 'manager' | 'user' || user?.role || 'user';
         
         // Debug logging for role-based pricing
-        console.log('User role for pricing:', userRole);
+        console.log('User role for pricing:', userRole, 'Original context:', originalUserContext);
 
         // Get hardware section
         const hardwareSection = sections.find(s => s.id === 'hardware');
@@ -304,7 +347,7 @@ export const useCalculatorStore = create<CalculatorState>()(
       name: 'calculator-storage',
       partialize: (state) => ({
         sections: state.sections,
-        dealDetails: state.dealDetails,
+        // Don't persist dealDetails to ensure fresh start each time
       }),
     }
   )

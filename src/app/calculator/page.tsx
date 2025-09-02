@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/store/auth';
 import { useCalculatorStore } from '@/store/calculator';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
@@ -12,13 +12,16 @@ import LicensingSection from '@/components/calculator/LicensingSection';
 import SettlementSection from '@/components/calculator/SettlementSection';
 import TotalCostsSection from '@/components/calculator/TotalCostsSection';
 
-export default function CalculatorPage() {
+function CalculatorPageContent() {
   const [tabIndex, setTabIndex] = useState(0);
   const [isInitializing, setIsInitializing] = useState(true);
   const [initError, setInitError] = useState<string | null>(null);
+  const [isLoadingDeal, setIsLoadingDeal] = useState(false);
+  const [dealContext, setDealContext] = useState<{ originalUserRole: string; originalUsername: string } | null>(null);
   const { isAuthenticated } = useAuthStore();
-  const { initializeStore } = useCalculatorStore();
+  const { initializeStore, loadDeal, resetDeal } = useCalculatorStore();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -47,6 +50,33 @@ export default function CalculatorPage() {
                 configStore.scales?.additional_costs?.cost_per_point) {
               console.log('Calculator initialized successfully');
               setIsInitializing(false);
+              
+              // Check if we need to load a specific deal
+              const dealId = searchParams.get('dealId');
+              const viewAsAdmin = searchParams.get('viewAsAdmin') === 'true';
+              
+              if (dealId) {
+                setIsLoadingDeal(true);
+                try {
+                  const deal = await loadDeal(dealId);
+                  if (deal && viewAsAdmin) {
+                    setDealContext({
+                      originalUserRole: deal.userRole,
+                      originalUsername: deal.username
+                    });
+                  }
+                } catch (error) {
+                  console.error('Error loading deal:', error);
+                  setInitError('Failed to load the selected deal.');
+                } finally {
+                  setIsLoadingDeal(false);
+                }
+              } else {
+                // Reset deal details for new deal
+                resetDeal();
+                setDealContext(null);
+              }
+              
               return;
             } else {
               console.log(`Retry ${retries + 1}: Config store not ready, retrying...`);
@@ -72,7 +102,7 @@ export default function CalculatorPage() {
     };
     
     init();
-  }, [isAuthenticated, router, initializeStore]);
+  }, [isAuthenticated, router, initializeStore, searchParams, loadDeal]);
 
   if (!isAuthenticated) {
     return null;
@@ -145,6 +175,13 @@ export default function CalculatorPage() {
             <p className="text-gray-600">
               Calculate comprehensive deal costs step by step
             </p>
+            {dealContext && (
+              <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-800">
+                  <strong>Viewing as Admin:</strong> This deal was created by {dealContext.originalUsername} ({dealContext.originalUserRole} pricing)
+                </p>
+              </div>
+            )}
           </div>
           <button
             onClick={() => router.push('/')}
@@ -219,4 +256,20 @@ export default function CalculatorPage() {
       </div>
     </div>
   );
-} 
+}
+
+export default function CalculatorPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <h2 className="text-xl font-semibold text-gray-700 mb-2">Loading Calculator...</h2>
+          <p className="text-gray-500">Please wait while we load the calculator.</p>
+        </div>
+      </div>
+    }>
+      <CalculatorPageContent />
+    </Suspense>
+  );
+}
