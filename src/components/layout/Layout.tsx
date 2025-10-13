@@ -7,6 +7,7 @@ import { useConfigStore } from '@/store/config';
 import Navigation from './Navigation';
 import OfflineAlert from './OfflineAlert';
 import PasswordChangeModal from '../auth/PasswordChangeModal';
+import { ToastProvider } from '@/components/ui/Toast';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -44,17 +45,12 @@ export default function Layout({ children }: LayoutProps) {
     initializeApp();
   }, [loadFromAPI]);
 
-  // Set up periodic sync from Supabase
-  useEffect(() => {
-    // Refresh from Supabase every 30 seconds to ensure cross-browser consistency
-    const syncInterval = setInterval(() => {
-      refreshFromSupabase();
-    }, 30000);
-
-    return () => {
-      clearInterval(syncInterval);
-    };
-  }, [refreshFromSupabase]);
+  // REMOVED: Auto-refresh was causing issues when editing in admin panel
+  // Config data will now only refresh:
+  // 1. On initial app load
+  // 2. After saving changes in admin panel
+  // 3. When manually requested by user
+  // This prevents losing unsaved changes during editing
 
   // Show password change modal if user requires password change
   useEffect(() => {
@@ -64,16 +60,21 @@ export default function Layout({ children }: LayoutProps) {
   }, [user?.requiresPasswordChange]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
-      <OfflineAlert />
-      <Navigation />
-      <main className="pt-16">
-        {children}
-      </main>
-      <PasswordChangeModal 
-        isOpen={showPasswordModal} 
-        onClose={() => setShowPasswordModal(false)} 
-      />
-    </div>
+    <ToastProvider>
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+        <a href="#main-content" className="skip-to-main">
+          Skip to main content
+        </a>
+        <OfflineAlert />
+        <Navigation />
+        <main id="main-content" className="pt-16" tabIndex={-1}>
+          {children}
+        </main>
+        <PasswordChangeModal 
+          isOpen={showPasswordModal} 
+          onClose={() => setShowPasswordModal(false)} 
+        />
+      </div>
+    </ToastProvider>
   );
 } 

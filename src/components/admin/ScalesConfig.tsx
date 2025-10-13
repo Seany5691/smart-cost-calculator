@@ -1,32 +1,104 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useConfigStore } from '@/store/config';
-import { Scales } from '@/lib/types';
-import { Save } from 'lucide-react';
+import { EnhancedScales, isEnhancedScales } from '@/lib/types';
+import { Save, AlertCircle } from 'lucide-react';
 
 export default function ScalesConfig() {
   const { scales, updateScales } = useConfigStore();
-  const [scalesData, setScalesData] = useState<Scales>({
-    installation: {},
-    finance_fee: {},
-    gross_profit: {},
-    additional_costs: { cost_per_kilometer: 0, cost_per_point: 0 }
+  const [scalesData, setScalesData] = useState<EnhancedScales>({
+    installation: { cost: {}, managerCost: {}, userCost: {} },
+    finance_fee: { cost: {}, managerCost: {}, userCost: {} },
+    gross_profit: { cost: {}, managerCost: {}, userCost: {} },
+    additional_costs: { 
+      cost_per_kilometer: 0, 
+      cost_per_point: 0,
+      manager_cost_per_kilometer: 0,
+      manager_cost_per_point: 0,
+      user_cost_per_kilometer: 0,
+      user_cost_per_point: 0
+    }
   });
+  const [activeTab, setActiveTab] = useState<'cost' | 'managerCost' | 'userCost'>('cost');
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [lastSaveTime, setLastSaveTime] = useState<number>(0);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [originalScalesData, setOriginalScalesData] = useState<EnhancedScales>({
+    installation: { cost: {}, managerCost: {}, userCost: {} },
+    finance_fee: { cost: {}, managerCost: {}, userCost: {} },
+    gross_profit: { cost: {}, managerCost: {}, userCost: {} },
+    additional_costs: { 
+      cost_per_kilometer: 0, 
+      cost_per_point: 0,
+      manager_cost_per_kilometer: 0,
+      manager_cost_per_point: 0,
+      user_cost_per_kilometer: 0,
+      user_cost_per_point: 0
+    }
+  });
+
+  // Deep comparison function to check if scales data has changed
+  const deepEqual = useCallback((obj1: any, obj2: any): boolean => {
+    return JSON.stringify(obj1) === JSON.stringify(obj2);
+  }, []);
 
   useEffect(() => {
-    setScalesData(scales);
-  }, [scales]);
+    // Don't override local changes if we just saved within the last 5 seconds
+    const timeSinceLastSave = Date.now() - lastSaveTime;
+    if (timeSinceLastSave < 5000) {
+      return;
+    }
+    
+    // Use scales data directly (assuming it's already in enhanced format)
+    let processedScales: EnhancedScales;
+    if (isEnhancedScales(scales)) {
+      processedScales = scales;
+    } else {
+      // Initialize with empty enhanced structure if not properly formatted
+      processedScales = {
+        installation: { cost: {}, managerCost: {}, userCost: {} },
+        finance_fee: { cost: {}, managerCost: {}, userCost: {} },
+        gross_profit: { cost: {}, managerCost: {}, userCost: {} },
+        additional_costs: { 
+          cost_per_kilometer: 0, 
+          cost_per_point: 0,
+          manager_cost_per_kilometer: 0,
+          manager_cost_per_point: 0,
+          user_cost_per_kilometer: 0,
+          user_cost_per_point: 0
+        }
+      };
+    }
+    
+    setScalesData(processedScales);
+    setOriginalScalesData(JSON.parse(JSON.stringify(processedScales))); // Deep copy
+    setHasUnsavedChanges(false);
+  }, [scales, lastSaveTime]);
 
-  const handleSave = async () => {
+  // Track changes to detect unsaved modifications
+  useEffect(() => {
+    const hasChanges = !deepEqual(scalesData, originalScalesData);
+    setHasUnsavedChanges(hasChanges);
+  }, [scalesData, originalScalesData, deepEqual]);
+
+  const handleBatchSave = async () => {
+    if (!hasUnsavedChanges) {
+      setMessage({ type: 'success', text: 'No changes to save.' });
+      return;
+    }
+
     setIsLoading(true);
     setMessage(null);
 
     try {
+      // Save the complete enhanced scales data structure
       await updateScales(scalesData);
-      setMessage({ type: 'success', text: 'Scales configuration saved successfully to Supabase!' });
+      setLastSaveTime(Date.now());
+      setOriginalScalesData(JSON.parse(JSON.stringify(scalesData))); // Update original data
+      setHasUnsavedChanges(false);
+      setMessage({ type: 'success', text: 'All scale changes saved successfully to Supabase!' });
     } catch (error) {
       console.error('Error saving scales config:', error);
       setMessage({ type: 'error', text: 'An error occurred while saving to Supabase. Please try again.' });
@@ -35,31 +107,129 @@ export default function ScalesConfig() {
     }
   };
 
+  // Handle browser navigation with unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
+        return e.returnValue;
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
+  // Helper function to check if a specific field has changed
+  const isFieldChanged = useCallback((section: string, key: string, tab: string) => {
+    if (section === 'additional_costs') {
+      const fieldMap = {
+        'cost_per_kilometer': tab === 'cost' ? 'cost_per_kilometer' : 
+                             tab === 'managerCost' ? 'manager_cost_per_kilometer' : 'user_cost_per_kilometer',
+        'cost_per_point': tab === 'cost' ? 'cost_per_point' : 
+                         tab === 'managerCost' ? 'manager_cost_per_point' : 'user_cost_per_point'
+      };
+      const mappedKey = fieldMap[key as keyof typeof fieldMap];
+      return (scalesData.additional_costs as any)[mappedKey] !== (originalScalesData.additional_costs as any)[mappedKey];
+    } else {
+      return (scalesData as any)[section][tab][key] !== (originalScalesData as any)[section][tab][key];
+    }
+  }, [scalesData, originalScalesData]);
+
+  // Helper function to get input class with change indicator
+  const getInputClassName = useCallback((section: string, key: string, tab: string) => {
+    const baseClass = "input w-32";
+    const isChanged = isFieldChanged(section, key, tab);
+    return isChanged ? `${baseClass} border-amber-400 bg-amber-50` : baseClass;
+  }, [isFieldChanged]);
+
+  // Reset changes to original values
+  const handleDiscardChanges = () => {
+    setScalesData(JSON.parse(JSON.stringify(originalScalesData)));
+    setHasUnsavedChanges(false);
+    setMessage({ type: 'success', text: 'All changes have been discarded.' });
+  };
+
+  // Count total number of changed fields
+  const getChangedFieldsCount = useCallback(() => {
+    let count = 0;
+    
+    // Check installation fields
+    installationBands.forEach(band => {
+      ['cost', 'managerCost', 'userCost'].forEach(tab => {
+        if (isFieldChanged('installation', band, tab)) count++;
+      });
+    });
+    
+    // Check finance fee fields
+    financeFeeRanges.forEach(range => {
+      ['cost', 'managerCost', 'userCost'].forEach(tab => {
+        if (isFieldChanged('finance_fee', range, tab)) count++;
+      });
+    });
+    
+    // Check gross profit fields
+    grossProfitBands.forEach(band => {
+      ['cost', 'managerCost', 'userCost'].forEach(tab => {
+        if (isFieldChanged('gross_profit', band, tab)) count++;
+      });
+    });
+    
+    // Check additional costs fields
+    ['cost_per_kilometer', 'cost_per_point'].forEach(field => {
+      ['cost', 'managerCost', 'userCost'].forEach(tab => {
+        if (isFieldChanged('additional_costs', field, tab)) count++;
+      });
+    });
+    
+    return count;
+  }, [isFieldChanged]);
+
   const updateInstallationBand = (band: string, value: number) => {
     setScalesData(prev => ({
       ...prev,
-      installation: { ...prev.installation, [band]: value }
+      installation: { 
+        ...prev.installation, 
+        [activeTab]: { ...prev.installation[activeTab], [band]: value }
+      }
     }));
   };
 
   const updateFinanceFeeRange = (range: string, value: number) => {
     setScalesData(prev => ({
       ...prev,
-      finance_fee: { ...prev.finance_fee, [range]: value }
+      finance_fee: { 
+        ...prev.finance_fee, 
+        [activeTab]: { ...prev.finance_fee[activeTab], [range]: value }
+      }
     }));
   };
 
   const updateGrossProfitBand = (band: string, value: number) => {
     setScalesData(prev => ({
       ...prev,
-      gross_profit: { ...prev.gross_profit, [band]: value }
+      gross_profit: { 
+        ...prev.gross_profit, 
+        [activeTab]: { ...prev.gross_profit[activeTab], [band]: value }
+      }
     }));
   };
 
-  const updateAdditionalCosts = (field: 'cost_per_kilometer' | 'cost_per_point', value: number) => {
+  const updateAdditionalCosts = (field: string, value: number) => {
+    const fieldMap = {
+      'cost_per_kilometer': activeTab === 'cost' ? 'cost_per_kilometer' : 
+                           activeTab === 'managerCost' ? 'manager_cost_per_kilometer' : 'user_cost_per_kilometer',
+      'cost_per_point': activeTab === 'cost' ? 'cost_per_point' : 
+                       activeTab === 'managerCost' ? 'manager_cost_per_point' : 'user_cost_per_point'
+    };
+    
     setScalesData(prev => ({
       ...prev,
-      additional_costs: { ...prev.additional_costs, [field]: value }
+      additional_costs: { 
+        ...prev.additional_costs, 
+        [fieldMap[field as keyof typeof fieldMap]]: value 
+      }
     }));
   };
 
@@ -70,15 +240,45 @@ export default function ScalesConfig() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold gradient-text">Scales Configuration</h2>
-        <button
-          onClick={handleSave}
-          disabled={isLoading}
-          className="btn btn-success flex items-center space-x-2"
-        >
-          <Save className="w-4 h-4" />
-          <span>{isLoading ? 'Saving to Supabase...' : 'Save Changes'}</span>
-        </button>
+        <div className="flex items-center space-x-3">
+          <h2 className="text-2xl font-bold gradient-text">Scales Configuration</h2>
+          {hasUnsavedChanges && (
+            <div className="flex items-center space-x-2 text-amber-600 bg-amber-50 px-3 py-1 rounded-full text-sm">
+              <AlertCircle className="w-4 h-4" />
+              <span>Unsaved changes</span>
+            </div>
+          )}
+        </div>
+        <div className="flex items-center space-x-3">
+          {hasUnsavedChanges && (
+            <button
+              onClick={handleDiscardChanges}
+              disabled={isLoading}
+              className="btn btn-outline text-gray-600 hover:text-gray-800"
+            >
+              Discard Changes
+            </button>
+          )}
+          <button
+            onClick={handleBatchSave}
+            disabled={isLoading || !hasUnsavedChanges}
+            className={`btn flex items-center space-x-2 ${
+              hasUnsavedChanges 
+                ? 'btn-success' 
+                : 'btn-secondary opacity-50 cursor-not-allowed'
+            }`}
+          >
+            <Save className="w-4 h-4" />
+            <span>
+              {isLoading 
+                ? 'Saving All Changes...' 
+                : hasUnsavedChanges 
+                  ? `Save All Changes (${getChangedFieldsCount()})` 
+                  : 'No Changes to Save'
+              }
+            </span>
+          </button>
+        </div>
       </div>
 
       {message && (
@@ -88,6 +288,54 @@ export default function ScalesConfig() {
           {message.text}
         </div>
       )}
+
+      {hasUnsavedChanges && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+          <div className="flex items-center space-x-2 mb-2">
+            <AlertCircle className="w-5 h-5 text-amber-600" />
+            <h3 className="font-semibold text-amber-800">Pending Changes Summary</h3>
+          </div>
+          <p className="text-amber-700 text-sm">
+            You have <strong>{getChangedFieldsCount()} unsaved changes</strong> across your scales configuration. 
+            Fields with changes are highlighted in amber. Use "Save All Changes" to persist all modifications 
+            or "Discard Changes" to revert to the last saved state.
+          </p>
+        </div>
+      )}
+
+      {/* Role-based tabs */}
+      <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg">
+        <button
+          onClick={() => setActiveTab('cost')}
+          className={`flex-1 py-2 px-4 rounded-md font-medium transition-all ${
+            activeTab === 'cost'
+              ? 'bg-white text-blue-700 shadow-sm'
+              : 'text-gray-600 hover:text-blue-600'
+          }`}
+        >
+          Cost Pricing (Admin)
+        </button>
+        <button
+          onClick={() => setActiveTab('managerCost')}
+          className={`flex-1 py-2 px-4 rounded-md font-medium transition-all ${
+            activeTab === 'managerCost'
+              ? 'bg-white text-blue-700 shadow-sm'
+              : 'text-gray-600 hover:text-blue-600'
+          }`}
+        >
+          Manager Pricing
+        </button>
+        <button
+          onClick={() => setActiveTab('userCost')}
+          className={`flex-1 py-2 px-4 rounded-md font-medium transition-all ${
+            activeTab === 'userCost'
+              ? 'bg-white text-blue-700 shadow-sm'
+              : 'text-gray-600 hover:text-blue-600'
+          }`}
+        >
+          User Pricing
+        </button>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Installation Costs */}
@@ -99,9 +347,9 @@ export default function ScalesConfig() {
                 <span className="font-medium">{band} extensions</span>
                 <input
                   type="number"
-                  value={scalesData.installation[band] || 0}
+                  value={scalesData.installation[activeTab][band] || 0}
                   onChange={(e) => updateInstallationBand(band, parseFloat(e.target.value) || 0)}
-                  className="input w-32"
+                  className={getInputClassName('installation', band, activeTab)}
                   step="0.01"
                 />
               </div>
@@ -118,9 +366,9 @@ export default function ScalesConfig() {
                 <span className="font-medium">{range}</span>
                 <input
                   type="number"
-                  value={scalesData.finance_fee[range] || 0}
+                  value={scalesData.finance_fee[activeTab][range] || 0}
                   onChange={(e) => updateFinanceFeeRange(range, parseFloat(e.target.value) || 0)}
-                  className="input w-32"
+                  className={getInputClassName('finance_fee', range, activeTab)}
                   step="0.01"
                 />
               </div>
@@ -137,9 +385,9 @@ export default function ScalesConfig() {
                 <span className="font-medium">{band} extensions</span>
                 <input
                   type="number"
-                  value={scalesData.gross_profit[band] || 0}
+                  value={scalesData.gross_profit[activeTab][band] || 0}
                   onChange={(e) => updateGrossProfitBand(band, parseFloat(e.target.value) || 0)}
-                  className="input w-32"
+                  className={getInputClassName('gross_profit', band, activeTab)}
                   step="0.01"
                 />
               </div>
@@ -155,9 +403,13 @@ export default function ScalesConfig() {
               <span className="font-medium">Cost per kilometer</span>
               <input
                 type="number"
-                value={scalesData.additional_costs.cost_per_kilometer || 0}
+                value={
+                  activeTab === 'cost' ? scalesData.additional_costs.cost_per_kilometer :
+                  activeTab === 'managerCost' ? scalesData.additional_costs.manager_cost_per_kilometer :
+                  scalesData.additional_costs.user_cost_per_kilometer || 0
+                }
                 onChange={(e) => updateAdditionalCosts('cost_per_kilometer', parseFloat(e.target.value) || 0)}
-                className="input w-32"
+                className={getInputClassName('additional_costs', 'cost_per_kilometer', activeTab)}
                 step="0.01"
               />
             </div>
@@ -165,9 +417,13 @@ export default function ScalesConfig() {
               <span className="font-medium">Cost per point</span>
               <input
                 type="number"
-                value={scalesData.additional_costs.cost_per_point || 0}
+                value={
+                  activeTab === 'cost' ? scalesData.additional_costs.cost_per_point :
+                  activeTab === 'managerCost' ? scalesData.additional_costs.manager_cost_per_point :
+                  scalesData.additional_costs.user_cost_per_point || 0
+                }
                 onChange={(e) => updateAdditionalCosts('cost_per_point', parseFloat(e.target.value) || 0)}
-                className="input w-32"
+                className={getInputClassName('additional_costs', 'cost_per_point', activeTab)}
                 step="0.01"
               />
             </div>
@@ -182,6 +438,9 @@ export default function ScalesConfig() {
           <li><strong>Finance Fees:</strong> Based on the total finance amount</li>
           <li><strong>Gross Profit:</strong> Base profit based on the number of extensions</li>
           <li><strong>Additional Costs:</strong> Distance and point-based costs</li>
+          <li><strong>Cost Pricing:</strong> Used for admin pricing calculations</li>
+          <li><strong>Manager Pricing:</strong> Used when managers access the calculator</li>
+          <li><strong>User Pricing:</strong> Used when regular users access the calculator</li>
           <li><strong>Changes are saved to Supabase:</strong> All updates are persisted across browsers</li>
         </ul>
       </div>

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { CalculatorState, Section, Item, DealDetails, TotalCosts } from '@/lib/types';
+import { CalculatorState, Item, DealDetails, TotalCosts } from '@/lib/types';
 import { getFactorForDeal, getItemCost } from '@/lib/utils';
 import { useConfigStore } from './config';
 
@@ -20,7 +20,6 @@ export const useCalculatorStore = create<CalculatorState>()(
       originalUserContext: null as { role: string; username: string } | null,
 
       initializeStore: async () => {
-        console.log('Initializing calculator store...');
         const configStore = useConfigStore.getState();
         
         // Ensure config store is loaded with comprehensive checks
@@ -28,17 +27,11 @@ export const useCalculatorStore = create<CalculatorState>()(
             !configStore.scales.additional_costs || 
             typeof configStore.scales.additional_costs.cost_per_kilometer === 'undefined' ||
             typeof configStore.scales.additional_costs.cost_per_point === 'undefined') {
-          console.log('Config store not fully initialized, loading from API...');
           await configStore.loadFromAPI();
         }
         
         // Get fresh state after loading
         const freshConfigStore = useConfigStore.getState();
-        console.log('Fresh config store state:', {
-          hasScales: !!freshConfigStore.scales,
-          hasFactors: !!freshConfigStore.factors,
-          additionalCosts: freshConfigStore.scales?.additional_costs
-        });
         
         // Final check to ensure we have all required data
         if (!freshConfigStore.scales?.additional_costs?.cost_per_kilometer || 
@@ -52,8 +45,8 @@ export const useCalculatorStore = create<CalculatorState>()(
           { id: 'connectivity', name: 'Connectivity', items: freshConfigStore.connectivity },
           { id: 'licensing', name: 'Licensing', items: freshConfigStore.licensing }
         ];
+        
         set({ sections });
-        console.log('Calculator store initialized successfully');
       },
 
       updateSectionItem: (sectionId: string, itemId: string, updates: Partial<Item>) => {
@@ -169,22 +162,31 @@ export const useCalculatorStore = create<CalculatorState>()(
       resetDeal: () => {
         set((state) => ({
           dealDetails: DEFAULT_DEAL_DETAILS,
-          originalUserContext: null
+          originalUserContext: null,
+          // Clear temporary items from all sections when starting a new deal
+          // This ensures temporary items from previous calculations don't carry over
+          // Addresses Requirement 3.6: Clear all temporary items when starting new deal calculation
+          sections: state.sections.map(section => ({
+            ...section,
+            items: section.items.filter(item => !item.isTemporary)
+          }))
+        }));
+      },
+
+      clearTemporaryItems: () => {
+        // Dedicated function to clear temporary items from all sections
+        // Can be called independently of resetDeal if needed
+        set((state) => ({
+          sections: state.sections.map(section => ({
+            ...section,
+            items: section.items.filter(item => !item.isTemporary)
+          }))
         }));
       },
 
       calculateTotalCosts: (): TotalCosts => {
         const { sections, dealDetails } = get();
         const configStore = useConfigStore.getState();
-        
-        // Debug logging
-        console.log('Config store state:', {
-          scales: configStore.scales,
-          factors: configStore.factors,
-          hasScales: !!configStore.scales,
-          hasFactors: !!configStore.factors,
-          additionalCosts: configStore.scales?.additional_costs
-        });
         
         // Ensure config store is available with comprehensive checks
         if (!configStore.scales || !configStore.factors || 
@@ -218,9 +220,7 @@ export const useCalculatorStore = create<CalculatorState>()(
         // Use original user context if available (for admin viewing other users' deals)
         const { originalUserContext } = get();
         const userRole: 'admin' | 'manager' | 'user' = originalUserContext?.role as 'admin' | 'manager' | 'user' || user?.role || 'user';
-        
-        // Debug logging for role-based pricing
-        console.log('User role for pricing:', userRole, 'Original context:', originalUserContext);
+
 
         // Get hardware section
         const hardwareSection = sections.find(s => s.id === 'hardware');
@@ -256,27 +256,90 @@ export const useCalculatorStore = create<CalculatorState>()(
         const hardwareTotal = hardwareSection.items
           .reduce((sum, item) => sum + (getItemCost(item, userRole) * item.quantity), 0);
 
+        // Helper function to get cost from scales data based on user role
+        const getScaleCost = (scaleData: any, userRole: 'admin' | 'manager' | 'user' = 'user', fieldSuffix?: string): any => {
+          if (!scaleData || typeof scaleData !== 'object') return 0;
+          
+          // For additional_costs, we need to handle different field names
+          if (fieldSuffix) {
+            const managerField = `manager_${fieldSuffix}`;
+            const userField = `user_${fieldSuffix}`;
+            const baseField = fieldSuffix;
+            
+            // Admin and Manager should use manager_* fields
+            if ((userRole === 'admin' || userRole === 'manager') && scaleData[managerField] !== undefined && scaleData[managerField] !== null) {
+              return typeof scaleData[managerField] === 'string' ? parseFloat(scaleData[managerField]) : scaleData[managerField];
+            } 
+            // User should use user_* fields
+            else if (userRole === 'user' && scaleData[userField] !== undefined && scaleData[userField] !== null) {
+              return typeof scaleData[userField] === 'string' ? parseFloat(scaleData[userField]) : scaleData[userField];
+            } 
+            // Fallback to base field
+            else if (scaleData[baseField] !== undefined && scaleData[baseField] !== null) {
+              return typeof scaleData[baseField] === 'string' ? parseFloat(scaleData[baseField]) : scaleData[baseField];
+            }
+          } else {
+            // Standard cost structure - return the appropriate role-based data (could be object or number)
+            // Admin and Manager should use managerCost
+            if ((userRole === 'admin' || userRole === 'manager') && scaleData.managerCost !== undefined && scaleData.managerCost !== null) {
+              return scaleData.managerCost;
+            } 
+            // User should use userCost
+            else if (userRole === 'user' && scaleData.userCost !== undefined && scaleData.userCost !== null) {
+              return scaleData.userCost;
+            } 
+            // Fallback to regular cost if specific pricing is not available
+            else if (scaleData.cost !== undefined && scaleData.cost !== null) {
+              return scaleData.cost;
+            }
+          }
+          
+          return 0;
+        };
+
         // Get installation cost based on extension count
         let installationCost = 0;
         if (configStore.scales?.installation) {
-          for (const [band, cost] of Object.entries(configStore.scales.installation)) {
-            const [min, max] = band.split('-').map(Number);
-            if (extensionCount >= (min || 0) && extensionCount <= (max || Infinity)) {
-              installationCost = cost;
-              break;
+          // First get the correct role-based data
+          const installationData = getScaleCost(configStore.scales.installation, userRole);
+          
+          // If installationData is an object with bands, parse it
+          if (typeof installationData === 'object' && installationData !== null) {
+            for (const [band, cost] of Object.entries(installationData)) {
+              const [min, max] = band.split('-').map(Number);
+              // Handle the "33+" case and other ranges properly
+              const maxValue = isNaN(max) ? Infinity : max;
+              if (extensionCount >= (min || 0) && extensionCount <= maxValue) {
+                installationCost = typeof cost === 'string' ? parseFloat(cost) : (typeof cost === 'number' ? cost : 0);
+                break;
+              }
             }
+          } else if (typeof installationData === 'number') {
+            // If it's already a number, use it directly
+            installationCost = installationData;
           }
         }
 
         // Get gross profit based on extension count
         let baseGrossProfit = 0;
         if (configStore.scales?.gross_profit) {
-          for (const [band, profit] of Object.entries(configStore.scales.gross_profit)) {
-            const [min, max] = band.split('-').map(Number);
-            if (extensionCount >= (min || 0) && extensionCount <= (max || Infinity)) {
-              baseGrossProfit = profit;
-              break;
+          // First get the correct role-based data
+          const grossProfitData = getScaleCost(configStore.scales.gross_profit, userRole);
+          
+          // If grossProfitData is an object with bands, parse it
+          if (typeof grossProfitData === 'object' && grossProfitData !== null) {
+            for (const [band, profit] of Object.entries(grossProfitData)) {
+              const [min, max] = band.split('-').map(Number);
+              // Handle the "33+" case and other ranges properly
+              const maxValue = isNaN(max) ? Infinity : max;
+              if (extensionCount >= (min || 0) && extensionCount <= maxValue) {
+                baseGrossProfit = typeof profit === 'string' ? parseFloat(profit) : (typeof profit === 'number' ? profit : 0);
+                break;
+              }
             }
+          } else if (typeof grossProfitData === 'number') {
+            // If it's already a number, use it directly
+            baseGrossProfit = grossProfitData;
           }
         }
 
@@ -288,34 +351,75 @@ export const useCalculatorStore = create<CalculatorState>()(
         const licensingCost = licensingSection.items
           .reduce((sum, item) => sum + (getItemCost(item, userRole) * item.quantity), 0);
 
-        // Calculate additional costs with null checks
-        const additionalCosts = configStore.scales?.additional_costs?.cost_per_kilometer && configStore.scales?.additional_costs?.cost_per_point ? 
-          (dealDetails.distanceToInstall * configStore.scales.additional_costs.cost_per_kilometer) +
-          (extensionCount * configStore.scales.additional_costs.cost_per_point) : 0;
+        // Calculate additional costs with proper role-based pricing
+        const costPerKilometer = configStore.scales?.additional_costs ? getScaleCost(configStore.scales.additional_costs, userRole, 'cost_per_kilometer') : 0;
+        const costPerPoint = configStore.scales?.additional_costs ? getScaleCost(configStore.scales.additional_costs, userRole, 'cost_per_point') : 0;
+        
+        const additionalCosts = (dealDetails.distanceToInstall * costPerKilometer) + (extensionCount * costPerPoint);
 
         // Calculate totals
-        const totalGrossProfit = baseGrossProfit;
+        const totalGrossProfit = typeof baseGrossProfit === 'number' ? baseGrossProfit : 0;
         const settlementAmount = dealDetails.settlement;
-        const extensionCost = extensionCount * (configStore.scales?.additional_costs?.cost_per_point || 0);
+        const extensionCost = extensionCount * (typeof costPerPoint === 'number' ? costPerPoint : 0);
         
-        // Calculate finance fee based on hardware + installation (for fee calculation only)
-        const feeCalculationAmount = hardwareTotal + installationCost;
+        // Calculate proper installation cost with sliding scale
+        const safeInstallationCost = typeof installationCost === 'number' ? installationCost : 0;
+        const totalInstallationCost = safeInstallationCost + extensionCost + (dealDetails.distanceToInstall * costPerKilometer);
+        
+        // Calculate base total payout (without finance fee initially)
+        const safeTotalGrossProfit = typeof totalGrossProfit === 'number' ? totalGrossProfit : 0;
+        let baseTotalPayout = hardwareTotal + totalInstallationCost + safeTotalGrossProfit + settlementAmount;
+        
+        // Iteratively calculate finance fee until it stabilizes
         let financeFee = 0;
-        if (configStore.scales?.finance_fee) {
-          for (const [range, fee] of Object.entries(configStore.scales.finance_fee)) {
-            const [min, max] = range.split('-').map(Number);
-            if (feeCalculationAmount >= (min || 0) && feeCalculationAmount <= (max || Infinity)) {
-              financeFee = fee;
-              break;
+        let previousFinanceFee = -1;
+        let iterations = 0;
+        const maxIterations = 10; // Prevent infinite loops
+        
+        while (financeFee !== previousFinanceFee && iterations < maxIterations) {
+          previousFinanceFee = financeFee;
+          const totalPayoutForFeeCalculation = baseTotalPayout + financeFee;
+          
+          // Calculate finance fee based on current total payout
+          if (configStore.scales?.finance_fee) {
+            const financeFeeBands = getScaleCost(configStore.scales.finance_fee, userRole);
+            
+            if (typeof financeFeeBands === 'object' && financeFeeBands !== null) {
+              // Reset finance fee before checking
+              financeFee = 0;
+              
+              // Use explicit range checking for finance fee bands
+              if (totalPayoutForFeeCalculation >= 0 && totalPayoutForFeeCalculation <= 20000) {
+                if (financeFeeBands['0-20000']) {
+                  financeFee = typeof financeFeeBands['0-20000'] === 'string' ? parseFloat(financeFeeBands['0-20000']) : financeFeeBands['0-20000'];
+                }
+              } else if (totalPayoutForFeeCalculation >= 20001 && totalPayoutForFeeCalculation <= 50000) {
+                if (financeFeeBands['20001-50000']) {
+                  financeFee = typeof financeFeeBands['20001-50000'] === 'string' ? parseFloat(financeFeeBands['20001-50000']) : financeFeeBands['20001-50000'];
+                }
+              } else if (totalPayoutForFeeCalculation >= 50001 && totalPayoutForFeeCalculation <= 100000) {
+                if (financeFeeBands['50001-100000']) {
+                  financeFee = typeof financeFeeBands['50001-100000'] === 'string' ? parseFloat(financeFeeBands['50001-100000']) : financeFeeBands['50001-100000'];
+                }
+              } else if (totalPayoutForFeeCalculation >= 100001) {
+                if (financeFeeBands['100001+']) {
+                  financeFee = typeof financeFeeBands['100001+'] === 'string' ? parseFloat(financeFeeBands['100001+']) : financeFeeBands['100001+'];
+                }
+              }
+            } else if (typeof financeFeeBands === 'number') {
+              financeFee = financeFeeBands;
             }
           }
+          
+          iterations++;
         }
         
-        // Calculate finance amount and total payout the same way
-        const financeAmount = hardwareTotal + extensionCost + installationCost + totalGrossProfit + financeFee + settlementAmount;
+        // Calculate final finance amount with stabilized finance fee
+        const safeFinanceFee = typeof financeFee === 'number' ? financeFee : 0;
+        const financeAmount = baseTotalPayout + safeFinanceFee;
         
         // Get factor for financing (using the new finance amount)
-        const factorUsed = configStore.factors ? getFactorForDeal(configStore.factors, dealDetails.term, dealDetails.escalation, financeAmount) : 0;
+        const factorUsed = configStore.factors ? getFactorForDeal(configStore.factors, dealDetails.term, dealDetails.escalation, financeAmount, userRole) : 0;
         
         // Total payout equals finance amount
         const totalPayout = financeAmount;
@@ -327,19 +431,19 @@ export const useCalculatorStore = create<CalculatorState>()(
         return {
           extensionCount,
           hardwareTotal,
-          hardwareInstallTotal: installationCost,
-          totalGrossProfit,
-          financeFee,
+          hardwareInstallTotal: typeof totalInstallationCost === 'number' ? totalInstallationCost : 0,
+          totalGrossProfit: typeof totalGrossProfit === 'number' ? totalGrossProfit : 0,
+          financeFee: typeof financeFee === 'number' ? financeFee : 0,
           settlementAmount,
-          financeAmount,
-          totalPayout,
-          hardwareRental,
+          financeAmount: typeof financeAmount === 'number' ? financeAmount : 0,
+          totalPayout: typeof totalPayout === 'number' ? totalPayout : 0,
+          hardwareRental: typeof hardwareRental === 'number' ? hardwareRental : 0,
           connectivityCost,
           licensingCost,
-          totalMRC,
-          totalExVat,
-          totalIncVat,
-          factorUsed
+          totalMRC: typeof totalMRC === 'number' ? totalMRC : 0,
+          totalExVat: typeof totalExVat === 'number' ? totalExVat : 0,
+          totalIncVat: typeof totalIncVat === 'number' ? totalIncVat : 0,
+          factorUsed: typeof factorUsed === 'number' ? factorUsed : 0
         };
       },
     }),
@@ -351,4 +455,20 @@ export const useCalculatorStore = create<CalculatorState>()(
       }),
     }
   )
-); 
+);
+
+// Optimized selectors for better performance
+// Use simple property access to avoid creating new objects on every render
+export const useCalculatorSections = () => useCalculatorStore((state) => state.sections);
+export const useCalculatorDealDetails = () => useCalculatorStore((state) => state.dealDetails);
+
+// Individual action selectors to avoid object creation
+export const useUpdateSectionItem = () => useCalculatorStore((state) => state.updateSectionItem);
+export const useAddTemporaryItem = () => useCalculatorStore((state) => state.addTemporaryItem);
+export const useUpdateDealDetails = () => useCalculatorStore((state) => state.updateDealDetails);
+export const useSaveDeal = () => useCalculatorStore((state) => state.saveDeal);
+export const useLoadDeal = () => useCalculatorStore((state) => state.loadDeal);
+export const useResetDeal = () => useCalculatorStore((state) => state.resetDeal);
+export const useClearTemporaryItems = () => useCalculatorStore((state) => state.clearTemporaryItems);
+export const useCalculateTotalCosts = () => useCalculatorStore((state) => state.calculateTotalCosts);
+export const useInitializeStore = () => useCalculatorStore((state) => state.initializeStore); 

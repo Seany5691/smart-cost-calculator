@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth';
-import { Calculator, Calendar, User, DollarSign, ArrowRight, Plus, FileText, Users, Shield } from 'lucide-react';
+import { getFactorForDeal } from '@/lib/utils';
+import { Calendar, User, DollarSign, Plus, FileText, Users, Shield, TrendingUp, Download, Eye, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 
 interface Deal {
@@ -30,6 +31,10 @@ export default function AdminDealsPage() {
   const [filteredDeals, setFilteredDeals] = useState<Deal[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUser, setSelectedUser] = useState<string>('all');
+  const [selectedDealForAnalysis, setSelectedDealForAnalysis] = useState<Deal | null>(null);
+  const [showCostAnalysis, setShowCostAnalysis] = useState(false);
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState<string | null>(null);
   const { user, checkAuth } = useAuthStore();
   const router = useRouter();
 
@@ -37,19 +42,35 @@ export default function AdminDealsPage() {
     try {
       // Load deals from localStorage with better error handling
       const dealsStorage = localStorage.getItem('deals-storage');
-      console.log('Raw deals storage:', dealsStorage);
-      
-      let allDeals = [];
+
+      let allDeals: Deal[] = [];
       if (dealsStorage) {
         try {
-          allDeals = JSON.parse(dealsStorage);
+          const parsedDeals = JSON.parse(dealsStorage);
+          // Ensure all deals have required properties with defaults
+          allDeals = Array.isArray(parsedDeals) ? parsedDeals.map((deal: any) => ({
+            id: deal.id || '',
+            userId: deal.userId || '',
+            username: deal.username || 'Unknown User',
+            userRole: deal.userRole || 'user',
+            customerName: deal.customerName || 'Unknown Customer',
+            term: Number(deal.term) || 0,
+            escalation: Number(deal.escalation) || 0,
+            distanceToInstall: Number(deal.distanceToInstall) || 0,
+            settlement: Number(deal.settlement) || 0,
+            sections: Array.isArray(deal.sections) ? deal.sections : [],
+            factors: deal.factors || {},
+            scales: deal.scales || {},
+            totals: deal.totals || {},
+            createdAt: deal.createdAt || new Date().toISOString(),
+            updatedAt: deal.updatedAt || new Date().toISOString()
+          })) : [];
         } catch (parseError) {
           console.error('Error parsing deals storage:', parseError);
           allDeals = [];
         }
       }
-      
-      console.log('Loaded deals:', allDeals);
+
       setDeals(allDeals);
       setFilteredDeals(allDeals);
     } catch (error) {
@@ -58,6 +79,35 @@ export default function AdminDealsPage() {
       setIsLoading(false);
     }
   }, []);
+
+  const deleteDeal = useCallback(async (dealId: string) => {
+    setIsDeleting(dealId);
+    try {
+      // Load current deals
+      const dealsStorage = localStorage.getItem('deals-storage');
+      let allDeals = [];
+
+      if (dealsStorage) {
+        allDeals = JSON.parse(dealsStorage);
+      }
+
+      // Remove the deal with the specified ID
+      const updatedDeals = allDeals.filter((deal: any) => deal.id !== dealId);
+
+      // Save back to localStorage
+      localStorage.setItem('deals-storage', JSON.stringify(updatedDeals));
+
+      // Reload deals to update the UI
+      await loadDeals();
+
+      return true;
+    } catch (error) {
+      console.error('Error deleting deal:', error);
+      return false;
+    } finally {
+      setIsDeleting(null);
+    }
+  }, [loadDeals]);
 
   useEffect(() => {
     if (!checkAuth()) {
@@ -85,7 +135,7 @@ export default function AdminDealsPage() {
 
     // Filter by search term
     if (searchTerm) {
-      filtered = filtered.filter(deal => 
+      filtered = filtered.filter(deal =>
         deal.customerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         deal.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         deal.id.toLowerCase().includes(searchTerm.toLowerCase())
@@ -105,11 +155,895 @@ export default function AdminDealsPage() {
     });
   };
 
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = (amount: number | undefined | null) => {
+    const numAmount = Number(amount) || 0;
     return new Intl.NumberFormat('en-ZA', {
       style: 'currency',
       currency: 'ZAR'
-    }).format(amount);
+    }).format(numAmount);
+  };
+
+  // Calculate comprehensive cost analysis for a deal
+  const calculateCostAnalysis = (deal: Deal) => {
+    const sections = deal.sections || [];
+    const totals = deal.totals as any || {};
+    const scales = deal.scales as any || {};
+
+    // Hardware costs (one-time)
+    let hardwareCostPrice = 0;
+    let hardwareUserManagerPrice = 0;
+    let hardwareItems: any[] = [];
+
+    // Monthly recurring costs
+    let connectivityCostPrice = 0;
+    let connectivityUserManagerPrice = 0;
+    let connectivityItems: any[] = [];
+
+    let licensingCostPrice = 0;
+    let licensingUserManagerPrice = 0;
+    let licensingItems: any[] = [];
+
+    sections.forEach((section: any) => {
+      if (section?.items && Array.isArray(section.items)) {
+        section.items.forEach((item: any) => {
+          if (item && (item.quantity || 0) > 0) {
+            const itemCost = Number(item.cost) || 0; // This is the admin cost price
+            const itemQuantity = Number(item.quantity) || 0;
+
+            // For user/manager pricing, we need to use the price they see, not the cost price
+            let itemUserManagerPrice = itemCost; // Default fallback
+
+            // Check if this is a manager or user and get their respective pricing
+            if (deal.userRole === 'manager') {
+              itemUserManagerPrice = Number(item.managerCost) || Number(item.cost) || 0;
+            } else {
+              itemUserManagerPrice = Number(item.userCost) || Number(item.cost) || 0;
+            }
+
+            const costPrice = itemCost * itemQuantity;
+            const userManagerPrice = itemUserManagerPrice * itemQuantity;
+
+            const itemBreakdown = {
+              name: item.name || 'Unknown Item',
+              quantity: itemQuantity,
+              costPrice: itemCost, // Admin cost price
+              userManagerPrice: itemUserManagerPrice, // What user/manager pays
+              totalCostPrice: costPrice,
+              totalUserManagerPrice: userManagerPrice
+            };
+
+            if (section.id === 'hardware') {
+              hardwareCostPrice += costPrice;
+              hardwareUserManagerPrice += userManagerPrice;
+              hardwareItems.push(itemBreakdown);
+            } else if (section.id === 'connectivity') {
+              connectivityCostPrice += costPrice;
+              connectivityUserManagerPrice += userManagerPrice;
+              connectivityItems.push(itemBreakdown);
+            } else if (section.id === 'licensing') {
+              licensingCostPrice += costPrice;
+              licensingUserManagerPrice += userManagerPrice;
+              licensingItems.push(itemBreakdown);
+            }
+          }
+        });
+      }
+    });
+
+    // ===== RECURRING SERVICES ANALYSIS (SEPARATE FROM HARDWARE DEAL) =====
+    const monthlyConnectivityProfit = connectivityUserManagerPrice - connectivityCostPrice;
+    const monthlyLicensingProfit = licensingUserManagerPrice - licensingCostPrice;
+    const totalMonthlyRecurringProfit = monthlyConnectivityProfit + monthlyLicensingProfit;
+
+    // ===== HARDWARE DEAL ANALYSIS (PAYOUT BASED) =====
+    const factors = deal.factors as any || {};
+
+    // Rep's figures (what they calculated)
+    const repFactorUsed = Number(totals.factorUsed) || 0;
+    const repPayout = Number(totals.totalPayout) || 0;
+    const repHardwareRental = Number(totals.hardwareRental) || 0;
+    const repFinanceAmount = Number(totals.financeAmount) || 0;
+    const repInstallationCost = Number(totals.hardwareInstallTotal) || 0;
+    const repGrossProfit = Number(totals.totalGrossProfit) || 0;
+    const repFinanceFee = Number(totals.financeFee) || 0;
+
+    // Get admin cost factor (for true cost analysis)
+    const adminCostFactor = factors.cost ?
+      getFactorForDeal(factors, deal.term, deal.escalation, repFinanceAmount, 'admin') : repFactorUsed;
+
+    // Get user/manager factor (what they actually get)
+    const adminUserManagerFactor = getFactorForDeal(factors, deal.term, deal.escalation, repFinanceAmount, deal.userRole as 'admin' | 'manager' | 'user') || repFactorUsed;
+
+    // Calculate actual payout using admin cost factor
+    const actualPayout = adminCostFactor > 0 ? repHardwareRental / adminCostFactor : 0;
+
+    // Calculate user/manager payout (what they think they're getting)
+    const userManagerPayout = adminUserManagerFactor > 0 ? repHardwareRental / adminUserManagerFactor : 0;
+
+    // Actual costs (admin cost prices)
+    const actualStockCost = hardwareCostPrice;
+    const extensionCount = Number(totals.extensionCount) || 0;
+    const dealSettlement = Number(deal.settlement) || 0;
+
+    // Calculate actual installation cost using proper sliding scale logic
+    let actualInstallationSlidingScale = 0;
+    if (scales?.installation?.cost) {
+      const installationData = scales.installation.cost;
+
+      if (typeof installationData === 'object' && installationData !== null) {
+        // Use explicit range checking for installation sliding scale
+        if (extensionCount >= 0 && extensionCount <= 4 && installationData['0-4']) {
+          actualInstallationSlidingScale = typeof installationData['0-4'] === 'string' ? parseFloat(installationData['0-4']) : installationData['0-4'];
+        } else if (extensionCount >= 5 && extensionCount <= 8 && installationData['5-8']) {
+          actualInstallationSlidingScale = typeof installationData['5-8'] === 'string' ? parseFloat(installationData['5-8']) : installationData['5-8'];
+        } else if (extensionCount >= 9 && extensionCount <= 16 && installationData['9-16']) {
+          actualInstallationSlidingScale = typeof installationData['9-16'] === 'string' ? parseFloat(installationData['9-16']) : installationData['9-16'];
+        } else if (extensionCount >= 17 && extensionCount <= 32 && installationData['17-32']) {
+          actualInstallationSlidingScale = typeof installationData['17-32'] === 'string' ? parseFloat(installationData['17-32']) : installationData['17-32'];
+        } else if (extensionCount >= 33 && installationData['33+']) {
+          actualInstallationSlidingScale = typeof installationData['33+'] === 'string' ? parseFloat(installationData['33+']) : installationData['33+'];
+        }
+      } else if (typeof installationData === 'number') {
+        actualInstallationSlidingScale = installationData;
+      }
+    }
+
+    // Calculate actual extension and fuel costs
+    const actualExtensionCost = extensionCount * (Number(scales?.additional_costs?.cost_per_point) || 0);
+    const actualFuelCost = Number(deal.distanceToInstall) * (Number(scales?.additional_costs?.cost_per_kilometer) || 0);
+    const actualInstallationCost = actualInstallationSlidingScale + actualExtensionCost + actualFuelCost;
+
+    // Calculate actual finance fee using iterative logic
+    let actualFinanceFee = 0;
+    if (scales?.finance_fee?.cost) {
+      // Calculate base total payout for admin cost calculation
+      let baseTotalPayout = actualStockCost + actualInstallationCost + repGrossProfit + dealSettlement;
+
+      // Iteratively calculate finance fee until it stabilizes
+      let previousFinanceFee = -1;
+      let iterations = 0;
+      const maxIterations = 10;
+
+      while (actualFinanceFee !== previousFinanceFee && iterations < maxIterations) {
+        previousFinanceFee = actualFinanceFee;
+        const totalPayoutForFeeCalculation = baseTotalPayout + actualFinanceFee;
+
+        const financeFeeBands = scales.finance_fee.cost;
+
+        if (typeof financeFeeBands === 'object' && financeFeeBands !== null) {
+          // Reset finance fee before checking
+          actualFinanceFee = 0;
+
+          // Use explicit range checking for finance fee bands
+          if (totalPayoutForFeeCalculation >= 0 && totalPayoutForFeeCalculation <= 20000) {
+            if (financeFeeBands['0-20000']) {
+              actualFinanceFee = typeof financeFeeBands['0-20000'] === 'string' ? parseFloat(financeFeeBands['0-20000']) : financeFeeBands['0-20000'];
+            }
+          } else if (totalPayoutForFeeCalculation >= 20001 && totalPayoutForFeeCalculation <= 50000) {
+            if (financeFeeBands['20001-50000']) {
+              actualFinanceFee = typeof financeFeeBands['20001-50000'] === 'string' ? parseFloat(financeFeeBands['20001-50000']) : financeFeeBands['20001-50000'];
+            }
+          } else if (totalPayoutForFeeCalculation >= 50001 && totalPayoutForFeeCalculation <= 100000) {
+            if (financeFeeBands['50001-100000']) {
+              actualFinanceFee = typeof financeFeeBands['50001-100000'] === 'string' ? parseFloat(financeFeeBands['50001-100000']) : financeFeeBands['50001-100000'];
+            }
+          } else if (totalPayoutForFeeCalculation >= 100001) {
+            if (financeFeeBands['100001+']) {
+              actualFinanceFee = typeof financeFeeBands['100001+'] === 'string' ? parseFloat(financeFeeBands['100001+']) : financeFeeBands['100001+'];
+            }
+          }
+        } else if (typeof financeFeeBands === 'number') {
+          actualFinanceFee = financeFeeBands;
+        }
+
+        iterations++;
+      }
+    }
+
+    // User/Manager costs (what they think the costs are)
+    const userManagerStockCost = hardwareUserManagerPrice;
+
+    // Calculate user/manager installation cost using proper sliding scale logic
+    let userManagerInstallationSlidingScale = 0;
+    if (scales?.installation) {
+      // Get the role-based installation data
+      let installationData;
+      if (deal.userRole === 'manager' || deal.userRole === 'admin') {
+        installationData = scales.installation.managerCost || scales.installation.cost;
+      } else {
+        installationData = scales.installation.userCost || scales.installation.cost;
+      }
+
+      if (typeof installationData === 'object' && installationData !== null) {
+        // Use explicit range checking for installation sliding scale
+        if (extensionCount >= 0 && extensionCount <= 4 && installationData['0-4']) {
+          userManagerInstallationSlidingScale = typeof installationData['0-4'] === 'string' ? parseFloat(installationData['0-4']) : installationData['0-4'];
+        } else if (extensionCount >= 5 && extensionCount <= 8 && installationData['5-8']) {
+          userManagerInstallationSlidingScale = typeof installationData['5-8'] === 'string' ? parseFloat(installationData['5-8']) : installationData['5-8'];
+        } else if (extensionCount >= 9 && extensionCount <= 16 && installationData['9-16']) {
+          userManagerInstallationSlidingScale = typeof installationData['9-16'] === 'string' ? parseFloat(installationData['9-16']) : installationData['9-16'];
+        } else if (extensionCount >= 17 && extensionCount <= 32 && installationData['17-32']) {
+          userManagerInstallationSlidingScale = typeof installationData['17-32'] === 'string' ? parseFloat(installationData['17-32']) : installationData['17-32'];
+        } else if (extensionCount >= 33 && installationData['33+']) {
+          userManagerInstallationSlidingScale = typeof installationData['33+'] === 'string' ? parseFloat(installationData['33+']) : installationData['33+'];
+        }
+      } else if (typeof installationData === 'number') {
+        userManagerInstallationSlidingScale = installationData;
+      }
+    }
+
+    // Calculate user/manager extension and fuel costs
+    let userManagerExtensionCost = 0;
+    let userManagerFuelCost = 0;
+
+    if (scales?.additional_costs) {
+      if (deal.userRole === 'manager' || deal.userRole === 'admin') {
+        userManagerExtensionCost = extensionCount * (Number(scales.additional_costs.manager_cost_per_point) || Number(scales.additional_costs.cost_per_point) || 0);
+        userManagerFuelCost = Number(deal.distanceToInstall) * (Number(scales.additional_costs.manager_cost_per_kilometer) || Number(scales.additional_costs.cost_per_kilometer) || 0);
+      } else {
+        userManagerExtensionCost = extensionCount * (Number(scales.additional_costs.user_cost_per_point) || Number(scales.additional_costs.cost_per_point) || 0);
+        userManagerFuelCost = Number(deal.distanceToInstall) * (Number(scales.additional_costs.user_cost_per_kilometer) || Number(scales.additional_costs.cost_per_kilometer) || 0);
+      }
+    }
+
+    const userManagerInstallationCost = userManagerInstallationSlidingScale + userManagerExtensionCost + userManagerFuelCost;
+    const userManagerFinanceFee = repFinanceFee; // They see the quoted finance fee
+
+    // Calculate actual gross profit using admin cost factor for true payout calculation
+    const actualGrossProfit = actualPayout - actualStockCost - dealSettlement - actualInstallationCost - actualFinanceFee;
+
+    // Calculate user/manager gross profit (what they think they're getting)
+    const userManagerGrossProfit = userManagerPayout - userManagerStockCost - dealSettlement - userManagerInstallationCost - userManagerFinanceFee;
+
+    // ===== COMPREHENSIVE TERM ANALYSIS =====
+    const dealTerm = Number(deal.term) || 0;
+
+    // Recurring services over full term
+    const termConnectivityCost = connectivityCostPrice * dealTerm;
+    const termConnectivityRevenue = connectivityUserManagerPrice * dealTerm;
+    const termConnectivityProfit = termConnectivityRevenue - termConnectivityCost;
+
+    const termLicensingCost = licensingCostPrice * dealTerm;
+    const termLicensingRevenue = licensingUserManagerPrice * dealTerm;
+    const termLicensingProfit = termLicensingRevenue - termLicensingCost;
+
+    // Total recurring over term
+    const totalRecurringCost = termConnectivityCost + termLicensingCost;
+    const totalRecurringRevenue = termConnectivityRevenue + termLicensingRevenue;
+    const totalRecurringProfit = totalRecurringRevenue - totalRecurringCost;
+    const termRecurringProfit = totalMonthlyRecurringProfit * dealTerm;
+
+    // Complete deal totals (hardware deal + recurring over full term) - ADMIN PERSPECTIVE
+    const completeDealActualCost = actualStockCost + dealSettlement + actualInstallationCost + actualFinanceFee + totalRecurringCost;
+    const completeDealActualRevenue = actualPayout + totalRecurringRevenue;
+    const completeDealActualProfit = completeDealActualRevenue - completeDealActualCost;
+
+    // Complete deal totals (hardware deal + recurring over full term) - USER/MANAGER PERSPECTIVE
+    const completeDealUserManagerCost = userManagerStockCost + dealSettlement + userManagerInstallationCost + userManagerFinanceFee + totalRecurringCost;
+    const completeDealUserManagerRevenue = userManagerPayout + totalRecurringRevenue;
+    const completeDealUserManagerProfit = completeDealUserManagerRevenue - completeDealUserManagerCost;
+
+    // Legacy calculations for backward compatibility
+    const totalCostPrice = hardwareCostPrice + connectivityCostPrice + licensingCostPrice;
+    const totalUserManagerPrice = hardwareUserManagerPrice + connectivityUserManagerPrice + licensingUserManagerPrice;
+    const totalProfit = totalUserManagerPrice - totalCostPrice;
+
+    return {
+      // Hardware (One-time)
+      hardware: {
+        costPrice: hardwareCostPrice,
+        userManagerPrice: hardwareUserManagerPrice,
+        items: hardwareItems,
+        profit: hardwareUserManagerPrice - hardwareCostPrice
+      },
+
+      // Monthly Recurring
+      connectivity: {
+        costPrice: connectivityCostPrice,
+        userManagerPrice: connectivityUserManagerPrice,
+        items: connectivityItems,
+        monthlyProfit: monthlyConnectivityProfit
+      },
+
+      licensing: {
+        costPrice: licensingCostPrice,
+        userManagerPrice: licensingUserManagerPrice,
+        items: licensingItems,
+        monthlyProfit: monthlyLicensingProfit
+      },
+
+      // Hardware Deal Analysis (Payout-based)
+      hardwareDeal: {
+        // Rep's calculations
+        rep: {
+          factorUsed: repFactorUsed,
+          payout: repPayout,
+          hardwareRental: repHardwareRental,
+          stockCost: userManagerStockCost,
+          installationCost: repInstallationCost,
+          financeFee: repFinanceFee,
+          settlement: dealSettlement,
+          grossProfit: repGrossProfit
+        },
+        // Admin's actual calculations
+        actual: {
+          factorUsed: adminCostFactor,
+          payout: actualPayout,
+          hardwareRental: repHardwareRental,
+          stockCost: actualStockCost,
+          installationCost: actualInstallationCost,
+          financeFee: actualFinanceFee,
+          settlement: dealSettlement,
+          grossProfit: actualGrossProfit
+        },
+        // User/Manager perspective
+        userManager: {
+          factorUsed: adminUserManagerFactor,
+          payout: userManagerPayout,
+          hardwareRental: repHardwareRental,
+          stockCost: userManagerStockCost,
+          installationCost: userManagerInstallationCost,
+          financeFee: userManagerFinanceFee,
+          settlement: dealSettlement,
+          grossProfit: userManagerGrossProfit
+        },
+        // Differences
+        differences: {
+          payoutDifference: actualPayout - repPayout,
+          stockCostDifference: actualStockCost - userManagerStockCost,
+          installCostDifference: actualInstallationCost - repInstallationCost,
+          grossProfitDifference: actualGrossProfit - repGrossProfit
+        }
+      },
+
+      // Recurring Services Analysis
+      recurringServices: {
+        monthly: {
+          connectivityProfit: monthlyConnectivityProfit,
+          licensingProfit: monthlyLicensingProfit,
+          totalProfit: totalMonthlyRecurringProfit
+        },
+        annual: {
+          connectivityProfit: monthlyConnectivityProfit * 12,
+          licensingProfit: monthlyLicensingProfit * 12,
+          totalProfit: totalMonthlyRecurringProfit * 12
+        },
+        fullTerm: {
+          connectivityProfit: termConnectivityProfit,
+          licensingProfit: termLicensingProfit,
+          totalProfit: termRecurringProfit
+        },
+        dealTerm: dealTerm
+      },
+
+      // Comprehensive Term Analysis
+      termAnalysis: {
+        dealTerm: dealTerm,
+        // Recurring services over full term
+        connectivity: {
+          cost: termConnectivityCost,
+          revenue: termConnectivityRevenue,
+          profit: termConnectivityProfit
+        },
+        licensing: {
+          cost: termLicensingCost,
+          revenue: termLicensingRevenue,
+          profit: termLicensingProfit
+        },
+        totalRecurring: {
+          cost: totalRecurringCost,
+          revenue: totalRecurringRevenue,
+          profit: totalRecurringProfit
+        },
+        // Complete deal totals (hardware deal + recurring over full term)
+        completeDeal: {
+          // Admin perspective (TRUE COSTS AND PROFITS)
+          actual: {
+            cost: completeDealActualCost,
+            revenue: completeDealActualRevenue,
+            profit: completeDealActualProfit,
+            margin: completeDealActualRevenue > 0 ? ((completeDealActualProfit / completeDealActualRevenue) * 100) : 0
+          },
+          // User/Manager perspective (what they think)
+          userManager: {
+            cost: completeDealUserManagerCost,
+            revenue: completeDealUserManagerRevenue,
+            profit: completeDealUserManagerProfit,
+            margin: completeDealUserManagerRevenue > 0 ? ((completeDealUserManagerProfit / completeDealUserManagerRevenue) * 100) : 0
+          },
+          // Legacy (for backward compatibility)
+          cost: completeDealUserManagerCost,
+          revenue: completeDealUserManagerRevenue,
+          profit: completeDealUserManagerProfit,
+          margin: completeDealUserManagerRevenue > 0 ? ((completeDealUserManagerProfit / completeDealUserManagerRevenue) * 100) : 0
+        }
+      },
+
+      // Deal Info
+      dealInfo: {
+        customerName: deal.customerName || 'Unknown Customer',
+        username: deal.username || 'Unknown User',
+        userRole: deal.userRole || 'user',
+        term: Number(deal.term) || 0,
+        escalation: Number(deal.escalation) || 0,
+        settlement: Number(deal.settlement) || 0,
+        extensionCount: Number(totals.extensionCount) || 0
+      },
+
+      // Additional calculated fields for modal
+      costPriceTotal: totalCostPrice,
+      userManagerPriceTotal: totalUserManagerPrice,
+      grossProfit: totalProfit,
+      grossProfitMargin: totalUserManagerPrice > 0 ? ((totalProfit / totalUserManagerPrice) * 100) : 0,
+
+      // Deal-specific calculations
+      dealGrossProfit: actualGrossProfit,
+      dealGrossProfitMargin: actualPayout > 0 ? ((actualGrossProfit / actualPayout) * 100) : 0,
+      breakdown: {
+        hardware: {
+          items: hardwareItems,
+          costPrice: hardwareCostPrice,
+          userManagerPrice: hardwareUserManagerPrice
+        },
+        connectivity: {
+          items: connectivityItems,
+          costPrice: connectivityCostPrice,
+          userManagerPrice: connectivityUserManagerPrice
+        },
+        licensing: {
+          items: licensingItems,
+          costPrice: licensingCostPrice,
+          userManagerPrice: licensingUserManagerPrice
+        }
+      }
+    };
+  };
+
+  // Generate comprehensive admin cost analysis HTML file
+  const generateCostAnalysisPDF = async (deal: Deal) => {
+    try {
+      const analysis = calculateCostAnalysis(deal);
+
+      // Create filename with timestamp
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+      const customerName = analysis.dealInfo.customerName || 'Unknown_Customer';
+      const filename = `Admin_Analysis_${customerName.replace(/[^a-zA-Z0-9]/g, '_')}_${timestamp}.html`;
+
+      // Create the HTML content for the analysis
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Complete Deal Analysis - ${analysis.dealInfo.customerName}</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; font-size: 12px; line-height: 1.4; }
+            .header { text-align: center; margin-bottom: 30px; }
+            .section { margin-bottom: 25px; page-break-inside: avoid; }
+            .table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
+            .table th, .table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            .table th { background-color: #f2f2f2; font-weight: bold; }
+            .text-right { text-align: right; }
+            .text-center { text-align: center; }
+            .font-bold { font-weight: bold; }
+            .text-green { color: #28a745; font-weight: bold; }
+            .text-red { color: #dc3545; font-weight: bold; }
+            .text-blue { color: #1976d2; font-weight: bold; }
+            .bg-purple { background: linear-gradient(to right, #f3e8ff, #fce7f3); padding: 20px; border-radius: 8px; }
+            .bg-gray { background-color: #f8f9fa; padding: 20px; border-radius: 8px; }
+            .bg-yellow { background: linear-gradient(to right, #fef3c7, #fed7aa); padding: 20px; border-radius: 8px; }
+            .bg-blue-light { background-color: #e3f2fd; }
+            .bg-gray-light { background-color: #f5f5f5; }
+            .bg-green-light { background-color: #e8f5e8; }
+            .border { border: 1px solid #ddd; padding: 15px; border-radius: 5px; margin: 10px 0; }
+            .grid { display: grid; gap: 20px; margin: 15px 0; }
+            .grid-2 { grid-template-columns: 1fr 1fr; }
+            .grid-4 { grid-template-columns: repeat(4, 1fr); }
+            h1 { color: #1976d2; margin-bottom: 10px; }
+            h2 { color: #1976d2; border-bottom: 2px solid #1976d2; padding-bottom: 5px; margin-top: 30px; }
+            h3 { color: #424242; margin: 15px 0 10px 0; }
+            h4 { color: #666; margin: 10px 0 5px 0; }
+            .highlight-box { background: linear-gradient(to right, #e1f5fe, #f3e5f5); padding: 15px; border-radius: 8px; margin: 15px 0; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>📊 Complete Deal Analysis</h1>
+            <h2>${analysis.dealInfo.customerName}</h2>
+            <p><strong>Rep:</strong> ${analysis.dealInfo.username} (${analysis.dealInfo.userRole}) | 
+               <strong>Term:</strong> ${analysis.dealInfo.term} months | 
+               <strong>Escalation:</strong> ${analysis.dealInfo.escalation}% | 
+               <strong>Extensions:</strong> ${analysis.dealInfo.extensionCount}</p>
+            <p><strong>Settlement:</strong> ${formatCurrency(analysis.dealInfo.settlement)}</p>
+          </div>
+
+          <!-- BRIEF SUMMARY -->
+          <div class="section bg-gray">
+            <h2>📈 Deal Summary Comparison</h2>
+            <div class="grid grid-2">
+              <div class="border bg-blue-light">
+                <h4 class="text-center">Rep's Calculation</h4>
+                <div style="margin: 10px 0;">
+                  <div style="display: flex; justify-content: space-between; margin: 5px 0;">
+                    <span>Deal Payout:</span>
+                    <span class="font-bold text-blue">${formatCurrency(analysis.hardwareDeal.rep.payout)}</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; margin: 5px 0;">
+                    <span>Gross Profit:</span>
+                    <span class="font-bold text-blue">${formatCurrency(analysis.hardwareDeal.rep.grossProfit)}</span>
+                  </div>
+                </div>
+              </div>
+              <div class="border bg-green-light">
+                <h4 class="text-center">Admin's Actual</h4>
+                <div style="margin: 10px 0;">
+                  <div style="display: flex; justify-content: space-between; margin: 5px 0;">
+                    <span>Deal Payout:</span>
+                    <span class="font-bold text-green">${formatCurrency(analysis.hardwareDeal.actual.payout)}</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; margin: 5px 0;">
+                    <span>Gross Profit:</span>
+                    <span class="font-bold text-green">${formatCurrency(analysis.hardwareDeal.actual.grossProfit)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="border bg-yellow text-center">
+              <div class="grid grid-2">
+                <div>
+                  <span class="font-bold">Payout Difference:</span>
+                  <span class="${analysis.hardwareDeal.differences.payoutDifference >= 0 ? 'text-green' : 'text-red'}" style="font-size: 18px; margin-left: 10px;">
+                    ${formatCurrency(analysis.hardwareDeal.differences.payoutDifference)}
+                  </span>
+                </div>
+                <div>
+                  <span class="font-bold">GP Difference:</span>
+                  <span class="${analysis.hardwareDeal.differences.grossProfitDifference >= 0 ? 'text-green' : 'text-red'}" style="font-size: 18px; margin-left: 10px;">
+                    ${formatCurrency(analysis.hardwareDeal.differences.grossProfitDifference)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- COMPLETE DEAL ANALYSIS -->
+          <div class="section bg-purple">
+            <h2>📈 Complete Deal Analysis (${analysis.termAnalysis.dealTerm} Month Term)</h2>
+            
+            <!-- One-time vs Recurring Breakdown -->
+            <div class="grid grid-2">
+              <!-- One-time Hardware -->
+              <div class="border" style="background-color: white;">
+                <h4>One-Time Hardware</h4>
+                <div style="margin: 10px 0;">
+                  <div style="display: flex; justify-content: space-between; margin: 5px 0;">
+                    <span>Cost Price:</span>
+                    <span class="font-bold">${formatCurrency(analysis.hardware.costPrice)}</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; margin: 5px 0;">
+                    <span>${analysis.dealInfo.userRole === 'manager' || analysis.dealInfo.userRole === 'admin' ? 'Manager' : 'User'} Price:</span>
+                    <span class="font-bold">${formatCurrency(analysis.hardware.userManagerPrice)}</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; margin: 10px 0; padding-top: 8px; border-top: 1px solid #ddd;">
+                    <span class="font-bold">Hardware Profit:</span>
+                    <span class="${analysis.hardware.profit >= 0 ? 'text-green' : 'text-red'}">${formatCurrency(analysis.hardware.profit)}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Recurring Services Over Full Term -->
+              <div class="border" style="background-color: white;">
+                <h4>Recurring Services (Full Term)</h4>
+                <div style="margin: 10px 0;">
+                  <div style="display: flex; justify-content: space-between; margin: 5px 0;">
+                    <span>Total Cost:</span>
+                    <span class="font-bold">${formatCurrency(analysis.termAnalysis.totalRecurring.cost)}</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; margin: 5px 0;">
+                    <span>Total Revenue:</span>
+                    <span class="font-bold">${formatCurrency(analysis.termAnalysis.totalRecurring.revenue)}</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; margin: 10px 0; padding-top: 8px; border-top: 1px solid #ddd;">
+                    <span class="font-bold">Recurring Profit:</span>
+                    <span class="${analysis.termAnalysis.totalRecurring.profit >= 0 ? 'text-green' : 'text-red'}">${formatCurrency(analysis.termAnalysis.totalRecurring.profit)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Complete Deal Totals -->
+            <div class="highlight-box">
+              <h4 style="text-align: center; margin-bottom: 15px;">Complete Deal Totals (Hardware + ${analysis.termAnalysis.dealTerm} Months Recurring)</h4>
+              <div class="grid grid-4">
+                <div style="text-align: center;">
+                  <p style="margin: 5px 0; color: #666;">Total Deal Cost</p>
+                  <p class="text-red" style="font-size: 18px; margin: 5px 0;">${formatCurrency(analysis.termAnalysis.completeDeal.actual.cost)}</p>
+                </div>
+                <div style="text-align: center;">
+                  <p style="margin: 5px 0; color: #666;">Total Deal Revenue</p>
+                  <p class="text-blue" style="font-size: 18px; margin: 5px 0;">${formatCurrency(analysis.termAnalysis.completeDeal.actual.revenue)}</p>
+                </div>
+                <div style="text-align: center;">
+                  <p style="margin: 5px 0; color: #666;">Total Deal Profit</p>
+                  <p class="${analysis.termAnalysis.completeDeal.actual.profit >= 0 ? 'text-green' : 'text-red'}" style="font-size: 18px; margin: 5px 0;">${formatCurrency(analysis.termAnalysis.completeDeal.actual.profit)}</p>
+                </div>
+                <div style="text-align: center;">
+                  <p style="margin: 5px 0; color: #666;">Deal Margin</p>
+                  <p class="${analysis.termAnalysis.completeDeal.actual.margin >= 0 ? 'text-green' : 'text-red'}" style="font-size: 18px; margin: 5px 0;">${analysis.termAnalysis.completeDeal.actual.margin.toFixed(2)}%</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- HARDWARE DEAL BREAKDOWN -->
+          <div class="section">
+            <h2>🔍 Hardware Deal Breakdown</h2>
+            <div class="grid" style="grid-template-columns: 1fr 1fr 1fr;">
+              <!-- Rep's Calculation -->
+              <div class="border bg-blue-light">
+                <h4 class="text-center">Rep's Calculation</h4>
+                <div style="margin: 10px 0;">
+                  <div style="display: flex; justify-content: space-between; margin: 5px 0;">
+                    <span>Factor Used:</span>
+                    <span class="font-bold">${analysis.hardwareDeal.rep.factorUsed.toFixed(5)}</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; margin: 5px 0;">
+                    <span>Hardware Rental:</span>
+                    <span class="font-bold">${formatCurrency(analysis.hardwareDeal.rep.hardwareRental)}</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; margin: 5px 0;">
+                    <span>Payout:</span>
+                    <span class="font-bold">${formatCurrency(analysis.hardwareDeal.rep.payout)}</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; margin: 5px 0;">
+                    <span>Stock Cost:</span>
+                    <span class="font-bold">${formatCurrency(analysis.hardwareDeal.rep.stockCost)}</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; margin: 5px 0;">
+                    <span>Installation:</span>
+                    <span class="font-bold">${formatCurrency(analysis.hardwareDeal.rep.installationCost)}</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; margin: 5px 0;">
+                    <span>Finance Fee:</span>
+                    <span class="font-bold">${formatCurrency(analysis.hardwareDeal.rep.financeFee)}</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; margin: 5px 0;">
+                    <span>Settlement:</span>
+                    <span class="font-bold">${formatCurrency(analysis.hardwareDeal.rep.settlement)}</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; margin: 10px 0; padding-top: 8px; border-top: 1px solid #ddd;">
+                    <span class="font-bold">Gross Profit:</span>
+                    <span class="font-bold text-blue">${formatCurrency(analysis.hardwareDeal.rep.grossProfit)}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Admin's Actual -->
+              <div class="border bg-green-light">
+                <h4 class="text-center">Admin's Actual</h4>
+                <div style="margin: 10px 0;">
+                  <div style="display: flex; justify-content: space-between; margin: 5px 0;">
+                    <span>Factor Used:</span>
+                    <span class="font-bold">${analysis.hardwareDeal.actual.factorUsed.toFixed(5)}</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; margin: 5px 0;">
+                    <span>Hardware Rental:</span>
+                    <span class="font-bold">${formatCurrency(analysis.hardwareDeal.actual.hardwareRental)}</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; margin: 5px 0;">
+                    <span>Payout:</span>
+                    <span class="font-bold">${formatCurrency(analysis.hardwareDeal.actual.payout)}</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; margin: 5px 0;">
+                    <span>Stock Cost:</span>
+                    <span class="font-bold">${formatCurrency(analysis.hardwareDeal.actual.stockCost)}</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; margin: 5px 0;">
+                    <span>Installation:</span>
+                    <span class="font-bold">${formatCurrency(analysis.hardwareDeal.actual.installationCost)}</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; margin: 5px 0;">
+                    <span>Finance Fee:</span>
+                    <span class="font-bold">${formatCurrency(analysis.hardwareDeal.actual.financeFee)}</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; margin: 5px 0;">
+                    <span>Settlement:</span>
+                    <span class="font-bold">${formatCurrency(analysis.hardwareDeal.actual.settlement)}</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; margin: 10px 0; padding-top: 8px; border-top: 1px solid #ddd;">
+                    <span class="font-bold">Gross Profit:</span>
+                    <span class="font-bold text-green">${formatCurrency(analysis.hardwareDeal.actual.grossProfit)}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Differences -->
+              <div class="border" style="background-color: #f8f4ff;">
+                <h4 class="text-center">Difference (Actual - Rep)</h4>
+                <div style="margin: 10px 0;">
+                  <div style="display: flex; justify-content: space-between; margin: 5px 0;">
+                    <span>Factor Diff:</span>
+                    <span class="${(analysis.hardwareDeal.actual.factorUsed - analysis.hardwareDeal.rep.factorUsed) >= 0 ? 'text-green' : 'text-red'}">${(analysis.hardwareDeal.actual.factorUsed - analysis.hardwareDeal.rep.factorUsed).toFixed(5)}</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; margin: 5px 0;">
+                    <span>Hardware Rental:</span>
+                    <span style="color: #666;">-</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; margin: 5px 0;">
+                    <span>Payout Diff:</span>
+                    <span class="${analysis.hardwareDeal.differences.payoutDifference >= 0 ? 'text-green' : 'text-red'}">${formatCurrency(analysis.hardwareDeal.differences.payoutDifference)}</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; margin: 5px 0;">
+                    <span>Stock Cost Diff:</span>
+                    <span class="${analysis.hardwareDeal.differences.stockCostDifference <= 0 ? 'text-green' : 'text-red'}">${formatCurrency(analysis.hardwareDeal.differences.stockCostDifference)}</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; margin: 5px 0;">
+                    <span>Install Cost Diff:</span>
+                    <span class="${analysis.hardwareDeal.differences.installCostDifference <= 0 ? 'text-green' : 'text-red'}">${formatCurrency(analysis.hardwareDeal.differences.installCostDifference)}</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; margin: 5px 0;">
+                    <span>Finance Fee Diff:</span>
+                    <span class="${(analysis.hardwareDeal.actual.financeFee - analysis.hardwareDeal.rep.financeFee) <= 0 ? 'text-green' : 'text-red'}">${formatCurrency(analysis.hardwareDeal.actual.financeFee - analysis.hardwareDeal.rep.financeFee)}</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; margin: 5px 0;">
+                    <span>Settlement:</span>
+                    <span style="color: #666;">-</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; margin: 10px 0; padding-top: 8px; border-top: 1px solid #ddd;">
+                    <span class="font-bold">GP Difference:</span>
+                    <span class="font-bold ${analysis.hardwareDeal.differences.grossProfitDifference >= 0 ? 'text-green' : 'text-red'}">${formatCurrency(analysis.hardwareDeal.differences.grossProfitDifference)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- MONTHLY RECURRING SERVICES -->
+          <div class="section">
+            <h2>📊 Monthly Recurring Services Analysis</h2>
+            <div class="grid" style="grid-template-columns: 1fr 1fr 1fr;">
+              <div class="border bg-blue-light">
+                <h4 class="text-center">Monthly Profit</h4>
+                <div style="margin: 10px 0;">
+                  <div style="display: flex; justify-content: space-between; margin: 5px 0;">
+                    <span>Connectivity:</span>
+                    <span class="font-bold">${formatCurrency(analysis.recurringServices.monthly.connectivityProfit)}</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; margin: 5px 0;">
+                    <span>Licensing:</span>
+                    <span class="font-bold">${formatCurrency(analysis.recurringServices.monthly.licensingProfit)}</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; margin: 10px 0; padding-top: 8px; border-top: 1px solid #ddd;">
+                    <span class="font-bold">Total Monthly:</span>
+                    <span class="font-bold text-blue">${formatCurrency(analysis.recurringServices.monthly.totalProfit)}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="border bg-green-light">
+                <h4 class="text-center">Annual Profit</h4>
+                <div style="margin: 10px 0;">
+                  <div style="display: flex; justify-content: space-between; margin: 5px 0;">
+                    <span>Connectivity:</span>
+                    <span class="font-bold">${formatCurrency(analysis.recurringServices.annual.connectivityProfit)}</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; margin: 5px 0;">
+                    <span>Licensing:</span>
+                    <span class="font-bold">${formatCurrency(analysis.recurringServices.annual.licensingProfit)}</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; margin: 10px 0; padding-top: 8px; border-top: 1px solid #ddd;">
+                    <span class="font-bold">Total Annual:</span>
+                    <span class="font-bold text-green">${formatCurrency(analysis.recurringServices.annual.totalProfit)}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="border" style="background-color: #f8f4ff;">
+                <h4 class="text-center">Full Term Profit (${analysis.recurringServices.dealTerm}m)</h4>
+                <div style="margin: 10px 0;">
+                  <div style="display: flex; justify-content: space-between; margin: 5px 0;">
+                    <span>Connectivity:</span>
+                    <span class="font-bold">${formatCurrency(analysis.recurringServices.fullTerm.connectivityProfit)}</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; margin: 5px 0;">
+                    <span>Licensing:</span>
+                    <span class="font-bold">${formatCurrency(analysis.recurringServices.fullTerm.licensingProfit)}</span>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; margin: 10px 0; padding-top: 8px; border-top: 1px solid #ddd;">
+                    <span class="font-bold">Total Term:</span>
+                    <span class="font-bold" style="color: #7c3aed;">${formatCurrency(analysis.recurringServices.fullTerm.totalProfit)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ITEM COST BREAKDOWN -->
+          <div class="section">
+            <h2>📋 Item Cost Breakdown</h2>
+            ${['hardware', 'connectivity', 'licensing'].map((sectionKey) => {
+              const section = analysis.breakdown[sectionKey as keyof typeof analysis.breakdown];
+              if (!section.items.length) return '';
+              
+              return `
+                <div style="margin-bottom: 25px;">
+                  <h3 style="background-color: #f5f5f5; padding: 10px; border-radius: 5px; text-transform: capitalize;">${sectionKey} Items</h3>
+                  <table class="table">
+                    <thead>
+                      <tr>
+                        <th>Item</th>
+                        <th>Qty</th>
+                        <th>Admin Cost</th>
+                        <th>User/Manager Price</th>
+                        <th>Total Cost</th>
+                        <th>Total Price</th>
+                        <th>Profit</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${section.items.map((item: any) => `
+                        <tr>
+                          <td class="font-bold">${item.name}</td>
+                          <td class="text-center">${item.quantity}</td>
+                          <td>${formatCurrency(item.costPrice)}</td>
+                          <td>${formatCurrency(item.userManagerPrice)}</td>
+                          <td class="font-bold">${formatCurrency(item.totalCostPrice)}</td>
+                          <td class="font-bold">${formatCurrency(item.totalUserManagerPrice)}</td>
+                          <td class="font-bold ${(item.totalUserManagerPrice - item.totalCostPrice) >= 0 ? 'text-green' : 'text-red'}">
+                            ${formatCurrency(item.totalUserManagerPrice - item.totalCostPrice)}
+                          </td>
+                        </tr>
+                      `).join('')}
+                      <tr style="background-color: #f0f0f0; font-weight: bold;">
+                        <td colspan="4"><strong>${sectionKey.charAt(0).toUpperCase() + sectionKey.slice(1)} Section Total:</strong></td>
+                        <td class="font-bold">${formatCurrency(section.costPrice)}</td>
+                        <td class="font-bold">${formatCurrency(section.userManagerPrice)}</td>
+                        <td class="font-bold ${(section.userManagerPrice - section.costPrice) >= 0 ? 'text-green' : 'text-red'}">
+                          ${formatCurrency(section.userManagerPrice - section.costPrice)}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              `;
+            }).join('')}
+          </div>
+
+          <div style="text-align: center; font-style: italic; color: #666; margin-top: 30px;">
+            <p><strong>🔒 CONFIDENTIAL:</strong> This report contains sensitive financial information and is for authorized admin personnel only.</p>
+            <p>Generated on ${new Date().toLocaleString()} | Report ID: ${deal.id}</p>
+          </div>
+        </body>
+        </html>
+      `;
+
+      // Create and download the HTML file
+      const blob = new Blob([htmlContent], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      // Open in new window for print preview
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        printWindow.document.write(htmlContent);
+        printWindow.document.close();
+        printWindow.focus();
+        
+        // Wait a moment for content to load, then trigger print dialog
+        setTimeout(() => {
+          printWindow.print();
+        }, 1000);
+      }
+
+    } catch (error) {
+      console.error('Error generating HTML report:', error);
+      alert('Error generating report. Please try again.');
+    }
   };
 
   // Get unique users for filter
@@ -123,177 +1057,726 @@ export default function AdminDealsPage() {
   });
 
   if (!user || user.role !== 'admin') {
-    return null;
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Shield className="mx-auto h-12 w-12 text-gray-400" />
+          <h1 className="mt-2 text-xl font-semibold text-gray-900">Access Denied</h1>
+          <p className="mt-1 text-gray-600">You need admin privileges to view this page.</p>
+        </div>
+      </div>
+    );
   }
 
-  return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold gradient-text mb-2">All Deal Calculations</h1>
-        <p className="text-gray-600">View and manage all deal calculations from all users</p>
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="mb-8">
+            <div className="h-10 bg-gray-200 rounded w-1/3 mb-2 animate-pulse"></div>
+            <div className="h-6 bg-gray-200 rounded w-1/2 animate-pulse"></div>
+          </div>
+          <div className="bg-white rounded-lg shadow-sm border p-6 mb-6 animate-pulse">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="h-10 bg-gray-200 rounded"></div>
+              <div className="h-10 bg-gray-200 rounded"></div>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="bg-white rounded-lg shadow-sm border p-6 animate-pulse">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex-1">
+                    <div className="h-6 bg-gray-200 rounded w-3/4 mb-2"></div>
+                    <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+                  </div>
+                  <div className="h-6 bg-gray-200 rounded w-16"></div>
+                </div>
+                <div className="h-4 bg-gray-200 rounded w-2/3 mb-4"></div>
+                <div className="space-y-2 mb-4">
+                  <div className="h-4 bg-gray-200 rounded"></div>
+                  <div className="h-4 bg-gray-200 rounded"></div>
+                  <div className="h-4 bg-gray-200 rounded"></div>
+                </div>
+                <div className="h-24 bg-gray-200 rounded mb-4"></div>
+                <div className="flex gap-2">
+                  <div className="flex-1 h-10 bg-gray-200 rounded"></div>
+                  <div className="flex-1 h-10 bg-gray-200 rounded"></div>
+                  <div className="flex-1 h-10 bg-gray-200 rounded"></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div className="card">
-          <div className="flex items-center">
-            <div className="p-3 rounded-lg bg-blue-500 text-white">
-              <FileText className="w-6 h-6" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Total Deals</p>
-              <p className="text-2xl font-bold text-gray-900">{deals.length}</p>
-            </div>
-          </div>
-        </div>
-        
-        <div className="card">
-          <div className="flex items-center">
-            <div className="p-3 rounded-lg bg-green-500 text-white">
-              <Users className="w-6 h-6" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Active Users</p>
-              <p className="text-2xl font-bold text-gray-900">{uniqueUsers.length}</p>
-            </div>
-          </div>
-        </div>
-        
-        <div className="card">
-          <div className="flex items-center">
-            <div className="p-3 rounded-lg bg-purple-500 text-white">
-              <DollarSign className="w-6 h-6" />
-            </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Total Value</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {formatCurrency(deals.reduce((sum, deal) => sum + (deal.totals?.totalPayout || 0), 0))}
+    );
+  }
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
+                <Shield className="h-8 w-8 text-blue-600" />
+                Admin Deal Management
+              </h1>
+              <p className="mt-2 text-gray-600">
+                Comprehensive view of all deals with cost analysis and management tools
               </p>
             </div>
-          </div>
-        </div>
-        
-        <div className="card">
-          <div className="flex items-center">
-            <div className="p-3 rounded-lg bg-orange-500 text-white">
-              <Shield className="w-6 h-6" />
+            <div className="flex items-center gap-4">
+              <div className="bg-white px-4 py-2 rounded-lg shadow-sm border">
+                <div className="flex items-center gap-2 text-sm">
+                  <Users className="h-4 w-4 text-gray-500" />
+                  <span className="font-medium">{deals.length}</span>
+                  <span className="text-gray-500">Total Deals</span>
+                </div>
+              </div>
+              <Link
+                href="/calculator"
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+              >
+                <Plus className="h-4 w-4" />
+                New Deal
+              </Link>
             </div>
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Admin Access</p>
-              <p className="text-2xl font-bold text-gray-900">Full</p>
+          </div>
+        </div>
+
+        {/* Filters */}
+        <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-2">
+                Search Deals
+              </label>
+              <input
+                type="text"
+                id="search"
+                placeholder="Search by customer, user, or deal ID..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label htmlFor="userFilter" className="block text-sm font-medium text-gray-700 mb-2">
+                Filter by User
+              </label>
+              <select
+                id="userFilter"
+                value={selectedUser}
+                onChange={(e) => setSelectedUser(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="all">All Users</option>
+                {uniqueUsers.map(user => (
+                  <option key={user.id} value={user.id}>
+                    {user.username} ({user.role})
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Filters */}
-      <div className="card mb-6">
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Search Deals</label>
-            <input
-              type="text"
-              placeholder="Search by customer name, username, or deal ID..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+        {/* Deals Grid */}
+        {filteredDeals.length === 0 ? (
+          <div className="bg-white rounded-lg shadow-sm border p-12 text-center">
+            <FileText className="mx-auto h-12 w-12 text-gray-400" />
+            <h3 className="mt-4 text-lg font-medium text-gray-900">No deals found</h3>
+            <p className="mt-2 text-gray-600">
+              {searchTerm || selectedUser !== 'all'
+                ? 'Try adjusting your search criteria or filters.'
+                : 'No deals have been created yet.'}
+            </p>
           </div>
-          <div className="md:w-64">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Filter by User</label>
-            <select
-              value={selectedUser}
-              onChange={(e) => setSelectedUser(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="all">All Users</option>
-              {uniqueUsers.map(user => (
-                <option key={user.id} value={user.id}>
-                  {user.username} ({user.role})
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-      </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+            {filteredDeals.map((deal) => {
+              const analysis = calculateCostAnalysis(deal);
 
-      {isLoading ? (
-        <div className="text-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-500">Loading all deals...</p>
-        </div>
-      ) : filteredDeals.length === 0 ? (
-        <div className="text-center py-12">
-          <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No deals found</h3>
-          <p className="text-gray-500 mb-4">
-            {searchTerm || selectedUser !== 'all' 
-              ? 'Try adjusting your search criteria' 
-              : 'No deals have been calculated yet'
-            }
-          </p>
-          {!searchTerm && selectedUser === 'all' && (
-            <Link href="/calculator" className="btn btn-primary inline-flex items-center space-x-2">
-              <Calculator className="w-4 h-4" />
-              <span>Start First Deal</span>
-            </Link>
-          )}
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredDeals.map((deal) => (
-            <div key={deal.id} className="card hover:shadow-lg transition-shadow duration-200">
-              <div className="p-6">
-                <div className="flex items-start justify-between mb-4">
-                    <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                                {deal.customerName || 'Unnamed Deal'}
-                    </h3>
-                    <p className="text-sm text-gray-500">Deal #{deal.id.slice(-6)}</p>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-sm font-medium text-gray-900">
-                                {formatCurrency(deal.totals?.totalPayout || 0)}
-                              </p>
-                    <p className="text-xs text-gray-500">Total Payout</p>
-                            </div>
-                          </div>
+              return (
+                <div key={deal.id} className="bg-white rounded-lg shadow-sm border hover:shadow-md transition-shadow">
+                  <div className="p-6">
+                    {/* Deal Header */}
+                    <div className="flex items-start justify-between mb-4">
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900 truncate">
+                          {deal.customerName}
+                        </h3>
+                        <p className="text-sm text-gray-600">
+                          ID: {deal.id.slice(-8)}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${deal.userRole === 'admin' ? 'bg-purple-100 text-purple-800' :
+                            deal.userRole === 'manager' ? 'bg-blue-100 text-blue-800' :
+                              'bg-green-100 text-green-800'
+                          }`}>
+                          {deal.userRole}
+                        </span>
+                      </div>
+                    </div>
 
-                <div className="space-y-2 mb-4">
-                  <div className="flex items-center text-sm text-gray-600">
-                    <User className="w-4 h-4 mr-2" />
-                    <span>{deal.username} ({deal.userRole})</span>
-                  </div>
-                  <div className="flex items-center text-sm text-gray-600">
-                    <Calendar className="w-4 h-4 mr-2" />
-                              <span>{deal.term} months</span>
-                            </div>
-                  <div className="flex items-center text-sm text-gray-600">
-                    <DollarSign className="w-4 h-4 mr-2" />
-                              <span>{deal.escalation}% escalation</span>
-                            </div>
-                  <div className="flex items-center text-sm text-gray-600">
-                    <Calculator className="w-4 h-4 mr-2" />
-                              <span>{deal.totals?.extensionCount || 0} extensions</span>
-                            </div>
-                          </div>
+                    {/* User Info */}
+                    <div className="flex items-center gap-2 mb-4">
+                      <User className="h-4 w-4 text-gray-500" />
+                      <span className="text-sm text-gray-700">{deal.username}</span>
+                    </div>
 
-                <div className="text-xs text-gray-500 mb-4">
-                  Created: {formatDate(deal.createdAt)}
-                          </div>
+                    {/* Deal Details */}
+                    <div className="space-y-2 mb-4">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-600 flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          Term
+                        </span>
+                        <span className="font-medium">{deal.term} months</span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-600 flex items-center gap-1">
+                          <TrendingUp className="h-3 w-3" />
+                          Escalation
+                        </span>
+                        <span className="font-medium">{deal.escalation}%</span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-600 flex items-center gap-1">
+                          <DollarSign className="h-3 w-3" />
+                          Settlement
+                        </span>
+                        <span className="font-medium">{formatCurrency(deal.settlement)}</span>
+                      </div>
+                    </div>
 
-                          <Link 
-                  href={`/calculator?dealId=${deal.id}&viewAsAdmin=true`}
-                  className="btn btn-outline w-full flex items-center justify-center space-x-2"
-                          >
-                  <ArrowRight className="w-4 h-4" />
-                  <span>View Deal</span>
-                          </Link>
+                    {/* Financial Summary */}
+                    <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                      <h4 className="text-sm font-medium text-gray-900 mb-2">Financial Overview</h4>
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600">Hardware Deal GP:</span>
+                          <span className="font-medium text-green-600">
+                            {formatCurrency(analysis.hardwareDeal.actual.grossProfit)}
+                          </span>
                         </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600">Monthly Recurring:</span>
+                          <span className="font-medium text-blue-600">
+                            {formatCurrency(analysis.recurringServices.monthly.totalProfit)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-sm border-t pt-1">
+                          <span className="text-gray-600 font-medium">Total Deal Value:</span>
+                          <span className="font-semibold text-gray-900">
+                            {formatCurrency(analysis.termAnalysis.completeDeal.actual.profit)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          setSelectedDealForAnalysis(deal);
+                          setShowCostAnalysis(true);
+                        }}
+                        className="flex-1 bg-blue-600 text-white px-3 py-2 rounded-md hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <Eye className="h-4 w-4" />
+                        Analyze
+                      </button>
+                      <button
+                        onClick={() => {
+                          setIsGeneratingPDF(deal.id);
+                          generateCostAnalysisPDF(deal);
+                          setTimeout(() => setIsGeneratingPDF(null), 2000);
+                        }}
+                        disabled={isGeneratingPDF === deal.id}
+                        className="flex-1 bg-green-600 text-white px-3 py-2 rounded-md hover:bg-green-700 transition-colors flex items-center justify-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isGeneratingPDF === deal.id ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                            <span>Generating...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Download className="h-4 w-4" />
+                            PDF
+                          </>
+                        )}
+                      </button>
+                      <button
+                        onClick={async () => {
+                          if (window.confirm('Are you sure you want to delete this deal? This action cannot be undone.')) {
+                            const success = await deleteDeal(deal.id);
+                            if (!success) {
+                              alert('Failed to delete deal. Please try again.');
+                            }
+                          }
+                        }}
+                        disabled={isDeleting === deal.id}
+                        className="flex-1 bg-red-600 text-white px-3 py-2 rounded-md hover:bg-red-700 transition-colors flex items-center justify-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isDeleting === deal.id ? (
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                        ) : (
+                          <Trash2 className="h-4 w-4" />
+                        )}
+                      </button>
+                    </div>
+
+                    {/* Created Date */}
+                    <div className="mt-4 pt-4 border-t">
+                      <p className="text-xs text-gray-500">
+                        Created: {formatDate(deal.createdAt)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Cost Analysis Modal */}
+        {showCostAnalysis && selectedDealForAnalysis && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold text-gray-900">
+                    Complete Deal Analysis - {selectedDealForAnalysis.customerName}
+                  </h2>
+                  <button
+                    onClick={() => {
+                      setShowCostAnalysis(false);
+                      setSelectedDealForAnalysis(null);
+                    }}
+                    className="text-gray-500 hover:text-gray-700"
+                  >
+                    <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                {(() => {
+                  const analysis = calculateCostAnalysis(selectedDealForAnalysis);
+
+                  return (
+                    <div className="space-y-6">
+                      {/* Deal Header Info */}
+                      <div className="text-center mb-6">
+                        <h3 className="text-xl font-bold text-blue-600 mb-2">📊 Complete Deal Analysis</h3>
+                        <h4 className="text-lg font-semibold text-gray-900">{analysis.dealInfo.customerName}</h4>
+                        <p className="text-sm text-gray-600 mt-2">
+                          <strong>Rep:</strong> {analysis.dealInfo.username} ({analysis.dealInfo.userRole}) | 
+                          <strong> Term:</strong> {analysis.dealInfo.term} months | 
+                          <strong> Escalation:</strong> {analysis.dealInfo.escalation}% | 
+                          <strong> Extensions:</strong> {analysis.dealInfo.extensionCount}
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          <strong>Settlement:</strong> {formatCurrency(analysis.dealInfo.settlement)}
+                        </p>
+                      </div>
+
+                      {/* Brief Summary */}
+                      <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-6 border-2 border-blue-200">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4 text-center">📈 Deal Summary Comparison</h3>
+                        <div className="grid grid-cols-2 gap-6">
+                          <div className="bg-white rounded-lg p-4 border">
+                            <h4 className="font-medium text-blue-900 mb-3 text-center">Rep's Calculation</h4>
+                            <div className="space-y-2 text-sm">
+                              <div className="flex justify-between">
+                                <span>Deal Payout:</span>
+                                <span className="font-semibold text-blue-700">{formatCurrency(analysis.hardwareDeal.rep.payout)}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Gross Profit:</span>
+                                <span className="font-semibold text-blue-700">{formatCurrency(analysis.hardwareDeal.rep.grossProfit)}</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="bg-white rounded-lg p-4 border">
+                            <h4 className="font-medium text-green-900 mb-3 text-center">Admin's Actual</h4>
+                            <div className="space-y-2 text-sm">
+                              <div className="flex justify-between">
+                                <span>Deal Payout:</span>
+                                <span className="font-semibold text-green-700">{formatCurrency(analysis.hardwareDeal.actual.payout)}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Gross Profit:</span>
+                                <span className="font-semibold text-green-700">{formatCurrency(analysis.hardwareDeal.actual.grossProfit)}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="mt-4 p-3 bg-white rounded-lg border-2 border-green-200 text-center">
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <span className="text-sm font-medium text-gray-700">Payout Difference:</span>
+                              <span className={`ml-2 font-bold text-lg ${analysis.hardwareDeal.differences.payoutDifference >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                {formatCurrency(analysis.hardwareDeal.differences.payoutDifference)}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-sm font-medium text-gray-700">GP Difference:</span>
+                              <span className={`ml-2 font-bold text-lg ${analysis.hardwareDeal.differences.grossProfitDifference >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                {formatCurrency(analysis.hardwareDeal.differences.grossProfitDifference)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Complete Deal Analysis */}
+                      <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-6 border">
+                        <h3 className="text-lg font-semibold text-blue-600 mb-4 border-b-2 border-blue-600 pb-2">📈 Complete Deal Analysis ({analysis.termAnalysis.dealTerm} Month Term)</h3>
+                        
+                        {/* One-time vs Recurring Breakdown */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                          {/* One-time Hardware */}
+                          <div className="bg-white rounded-lg p-4 border">
+                            <h4 className="font-medium text-gray-700 mb-3">One-Time Hardware</h4>
+                            <div className="space-y-2 text-sm">
+                              <div className="flex justify-between">
+                                <span>Cost Price:</span>
+                                <span className="font-medium">{formatCurrency(analysis.hardware.costPrice)}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>{analysis.dealInfo.userRole === 'manager' || analysis.dealInfo.userRole === 'admin' ? 'Manager' : 'User'} Price:</span>
+                                <span className="font-medium">{formatCurrency(analysis.hardware.userManagerPrice)}</span>
+                              </div>
+                              <div className="flex justify-between border-t pt-2">
+                                <span className="font-semibold">Hardware Profit:</span>
+                                <span className={`font-semibold ${analysis.hardware.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                  {formatCurrency(analysis.hardware.profit)}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Recurring Services Over Full Term */}
+                          <div className="bg-white rounded-lg p-4 border">
+                            <h4 className="font-medium text-gray-700 mb-3">Recurring Services (Full Term)</h4>
+                            <div className="space-y-2 text-sm">
+                              <div className="flex justify-between">
+                                <span>Total Cost:</span>
+                                <span className="font-medium">{formatCurrency(analysis.termAnalysis.totalRecurring.cost)}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Total Revenue:</span>
+                                <span className="font-medium">{formatCurrency(analysis.termAnalysis.totalRecurring.revenue)}</span>
+                              </div>
+                              <div className="flex justify-between border-t pt-2">
+                                <span className="font-semibold">Recurring Profit:</span>
+                                <span className={`font-semibold ${analysis.termAnalysis.totalRecurring.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                  {formatCurrency(analysis.termAnalysis.totalRecurring.profit)}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Complete Deal Totals */}
+                        <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-4 border-2 border-blue-200">
+                          <h4 className="font-semibold text-center mb-4">Complete Deal Totals (Hardware + {analysis.termAnalysis.dealTerm} Months Recurring)</h4>
+                          <div className="grid grid-cols-4 gap-4 text-center">
+                            <div>
+                              <p className="text-sm text-gray-600 mb-1">Total Deal Cost</p>
+                              <p className="font-bold text-red-600 text-lg">{formatCurrency(analysis.termAnalysis.completeDeal.actual.cost)}</p>
+                            </div>
+                            <div>
+                              <p className="text-sm text-gray-600 mb-1">Total Deal Revenue</p>
+                              <p className="font-bold text-blue-600 text-lg">{formatCurrency(analysis.termAnalysis.completeDeal.actual.revenue)}</p>
+                            </div>
+                            <div>
+                              <p className="text-sm text-gray-600 mb-1">Total Deal Profit</p>
+                              <p className={`font-bold text-lg ${analysis.termAnalysis.completeDeal.actual.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                {formatCurrency(analysis.termAnalysis.completeDeal.actual.profit)}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-sm text-gray-600 mb-1">Deal Margin</p>
+                              <p className={`font-bold text-lg ${analysis.termAnalysis.completeDeal.actual.margin >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                {analysis.termAnalysis.completeDeal.actual.margin.toFixed(2)}%
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Hardware Deal Breakdown - Full Comparison */}
+                      <div className="bg-white border rounded-lg p-6">
+                        <h3 className="text-lg font-semibold text-blue-600 mb-4 border-b-2 border-blue-600 pb-2">🔍 Hardware Deal Breakdown</h3>
+                        
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                          {/* Rep's Calculation */}
+                          <div className="bg-blue-50 rounded-lg p-4 border">
+                            <h4 className="font-medium text-blue-900 mb-3 text-center">Rep's Calculation</h4>
+                            <div className="space-y-2 text-sm">
+                              <div className="flex justify-between">
+                                <span>Factor Used:</span>
+                                <span className="font-medium">{analysis.hardwareDeal.rep.factorUsed.toFixed(5)}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Hardware Rental:</span>
+                                <span className="font-medium">{formatCurrency(analysis.hardwareDeal.rep.hardwareRental)}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Payout:</span>
+                                <span className="font-medium">{formatCurrency(analysis.hardwareDeal.rep.payout)}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Stock Cost:</span>
+                                <span className="font-medium">{formatCurrency(analysis.hardwareDeal.rep.stockCost)}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Installation:</span>
+                                <span className="font-medium">{formatCurrency(analysis.hardwareDeal.rep.installationCost)}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Finance Fee:</span>
+                                <span className="font-medium">{formatCurrency(analysis.hardwareDeal.rep.financeFee)}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Settlement:</span>
+                                <span className="font-medium">{formatCurrency(analysis.hardwareDeal.rep.settlement)}</span>
+                              </div>
+                              <div className="flex justify-between border-t pt-2">
+                                <span className="font-semibold">Gross Profit:</span>
+                                <span className="font-bold text-blue-700">{formatCurrency(analysis.hardwareDeal.rep.grossProfit)}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Admin's Actual */}
+                          <div className="bg-green-50 rounded-lg p-4 border">
+                            <h4 className="font-medium text-green-900 mb-3 text-center">Admin's Actual</h4>
+                            <div className="space-y-2 text-sm">
+                              <div className="flex justify-between">
+                                <span>Factor Used:</span>
+                                <span className="font-medium">{analysis.hardwareDeal.actual.factorUsed.toFixed(5)}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Hardware Rental:</span>
+                                <span className="font-medium">{formatCurrency(analysis.hardwareDeal.actual.hardwareRental)}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Payout:</span>
+                                <span className="font-medium">{formatCurrency(analysis.hardwareDeal.actual.payout)}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Stock Cost:</span>
+                                <span className="font-medium">{formatCurrency(analysis.hardwareDeal.actual.stockCost)}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Installation:</span>
+                                <span className="font-medium">{formatCurrency(analysis.hardwareDeal.actual.installationCost)}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Finance Fee:</span>
+                                <span className="font-medium">{formatCurrency(analysis.hardwareDeal.actual.financeFee)}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Settlement:</span>
+                                <span className="font-medium">{formatCurrency(analysis.hardwareDeal.actual.settlement)}</span>
+                              </div>
+                              <div className="flex justify-between border-t pt-2">
+                                <span className="font-semibold">Gross Profit:</span>
+                                <span className="font-bold text-green-700">{formatCurrency(analysis.hardwareDeal.actual.grossProfit)}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Differences */}
+                          <div className="bg-purple-50 rounded-lg p-4 border">
+                            <h4 className="font-medium text-purple-900 mb-3 text-center">Difference (Actual - Rep)</h4>
+                            <div className="space-y-2 text-sm">
+                              <div className="flex justify-between">
+                                <span>Factor Diff:</span>
+                                <span className={`font-medium ${(analysis.hardwareDeal.actual.factorUsed - analysis.hardwareDeal.rep.factorUsed) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                  {(analysis.hardwareDeal.actual.factorUsed - analysis.hardwareDeal.rep.factorUsed).toFixed(5)}
+                                </span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Hardware Rental:</span>
+                                <span className="font-medium text-gray-600">-</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Payout Diff:</span>
+                                <span className={`font-medium ${analysis.hardwareDeal.differences.payoutDifference >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                  {formatCurrency(analysis.hardwareDeal.differences.payoutDifference)}
+                                </span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Stock Cost Diff:</span>
+                                <span className={`font-medium ${analysis.hardwareDeal.differences.stockCostDifference <= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                  {formatCurrency(analysis.hardwareDeal.differences.stockCostDifference)}
+                                </span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Install Cost Diff:</span>
+                                <span className={`font-medium ${analysis.hardwareDeal.differences.installCostDifference <= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                  {formatCurrency(analysis.hardwareDeal.differences.installCostDifference)}
+                                </span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Finance Fee Diff:</span>
+                                <span className={`font-medium ${(analysis.hardwareDeal.actual.financeFee - analysis.hardwareDeal.rep.financeFee) <= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                  {formatCurrency(analysis.hardwareDeal.actual.financeFee - analysis.hardwareDeal.rep.financeFee)}
+                                </span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Settlement:</span>
+                                <span className="font-medium text-gray-600">-</span>
+                              </div>
+                              <div className="flex justify-between border-t pt-2">
+                                <span className="font-semibold">GP Difference:</span>
+                                <span className={`font-bold ${analysis.hardwareDeal.differences.grossProfitDifference >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                  {formatCurrency(analysis.hardwareDeal.differences.grossProfitDifference)}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Monthly Recurring Services Analysis */}
+                      <div className="bg-white border rounded-lg p-6">
+                        <h3 className="text-lg font-semibold text-blue-600 mb-4 border-b-2 border-blue-600 pb-2">📊 Monthly Recurring Services Analysis</h3>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                          <div className="bg-blue-50 rounded-lg p-4 border">
+                            <h4 className="font-medium text-blue-900 mb-3 text-center">Monthly Profit</h4>
+                            <div className="space-y-2 text-sm">
+                              <div className="flex justify-between">
+                                <span>Connectivity:</span>
+                                <span className="font-medium">{formatCurrency(analysis.recurringServices.monthly.connectivityProfit)}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Licensing:</span>
+                                <span className="font-medium">{formatCurrency(analysis.recurringServices.monthly.licensingProfit)}</span>
+                              </div>
+                              <div className="flex justify-between border-t pt-2">
+                                <span className="font-semibold">Total Monthly:</span>
+                                <span className="font-bold text-blue-700">{formatCurrency(analysis.recurringServices.monthly.totalProfit)}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="bg-green-50 rounded-lg p-4 border">
+                            <h4 className="font-medium text-green-900 mb-3 text-center">Annual Profit</h4>
+                            <div className="space-y-2 text-sm">
+                              <div className="flex justify-between">
+                                <span>Connectivity:</span>
+                                <span className="font-medium">{formatCurrency(analysis.recurringServices.annual.connectivityProfit)}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Licensing:</span>
+                                <span className="font-medium">{formatCurrency(analysis.recurringServices.annual.licensingProfit)}</span>
+                              </div>
+                              <div className="flex justify-between border-t pt-2">
+                                <span className="font-semibold">Total Annual:</span>
+                                <span className="font-bold text-green-700">{formatCurrency(analysis.recurringServices.annual.totalProfit)}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="bg-purple-50 rounded-lg p-4 border">
+                            <h4 className="font-medium text-purple-900 mb-3 text-center">Full Term Profit ({analysis.recurringServices.dealTerm}m)</h4>
+                            <div className="space-y-2 text-sm">
+                              <div className="flex justify-between">
+                                <span>Connectivity:</span>
+                                <span className="font-medium">{formatCurrency(analysis.recurringServices.fullTerm.connectivityProfit)}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Licensing:</span>
+                                <span className="font-medium">{formatCurrency(analysis.recurringServices.fullTerm.licensingProfit)}</span>
+                              </div>
+                              <div className="flex justify-between border-t pt-2">
+                                <span className="font-semibold">Total Term:</span>
+                                <span className="font-bold text-purple-700">{formatCurrency(analysis.recurringServices.fullTerm.totalProfit)}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Item Cost Breakdown */}
+                      <div className="bg-white border rounded-lg p-6">
+                        <h3 className="text-lg font-semibold text-blue-600 mb-4 border-b-2 border-blue-600 pb-2">📋 Item Cost Breakdown</h3>
+
+                        {['hardware', 'connectivity', 'licensing'].map((sectionKey) => {
+                          const section = analysis.breakdown[sectionKey as keyof typeof analysis.breakdown];
+                          if (!section.items.length) return null;
+
+                          return (
+                            <div key={sectionKey} className="mb-6">
+                              <h4 className="font-medium text-gray-900 mb-3 capitalize bg-gray-50 p-2 rounded">{sectionKey} Items</h4>
+                              <div className="overflow-x-auto">
+                                <table className="min-w-full divide-y divide-gray-200 border rounded-lg">
+                                  <thead className="bg-gray-50">
+                                    <tr>
+                                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Item</th>
+                                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Qty</th>
+                                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Admin Cost</th>
+                                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User/Manager Price</th>
+                                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Cost</th>
+                                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Price</th>
+                                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Profit</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="bg-white divide-y divide-gray-200">
+                                    {section.items.map((item: any, index: number) => (
+                                      <tr key={index} className="hover:bg-gray-50">
+                                        <td className="px-4 py-3 text-sm text-gray-900 font-medium">{item.name}</td>
+                                        <td className="px-4 py-3 text-sm text-gray-900 text-center">{item.quantity}</td>
+                                        <td className="px-4 py-3 text-sm text-gray-900">{formatCurrency(item.costPrice)}</td>
+                                        <td className="px-4 py-3 text-sm text-gray-900">{formatCurrency(item.userManagerPrice)}</td>
+                                        <td className="px-4 py-3 text-sm text-gray-900 font-medium">{formatCurrency(item.totalCostPrice)}</td>
+                                        <td className="px-4 py-3 text-sm text-gray-900 font-medium">{formatCurrency(item.totalUserManagerPrice)}</td>
+                                        <td className={`px-4 py-3 text-sm font-semibold ${(item.totalUserManagerPrice - item.totalCostPrice) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                          {formatCurrency(item.totalUserManagerPrice - item.totalCostPrice)}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                    <tr className="bg-gray-100 font-semibold">
+                                      <td className="px-4 py-3 text-sm text-gray-900" colSpan={4}>
+                                        <strong>{sectionKey.charAt(0).toUpperCase() + sectionKey.slice(1)} Section Total:</strong>
+                                      </td>
+                                      <td className="px-4 py-3 text-sm text-gray-900 font-bold">{formatCurrency(section.costPrice)}</td>
+                                      <td className="px-4 py-3 text-sm text-gray-900 font-bold">{formatCurrency(section.userManagerPrice)}</td>
+                                      <td className={`px-4 py-3 text-sm font-bold ${(section.userManagerPrice - section.costPrice) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                        {formatCurrency(section.userManagerPrice - section.costPrice)}
+                                      </td>
+                                    </tr>
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Confidential Footer */}
+                      <div className="text-center text-xs text-gray-500 italic mt-6 p-4 bg-gray-50 rounded-lg border">
+                        <p><strong>🔒 CONFIDENTIAL:</strong> This report contains sensitive financial information and is for authorized admin personnel only.</p>
+                        <p>Generated on {new Date().toLocaleString()} | Report ID: {selectedDealForAnalysis.id}</p>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
             </div>
-          ))}
-        </div>
-      )}
+          </div>
+        )}
+      </div>
     </div>
   );
-} 
+}

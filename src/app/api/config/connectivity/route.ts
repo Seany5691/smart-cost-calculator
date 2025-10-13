@@ -5,7 +5,17 @@ import { Item } from '@/lib/types';
 export async function GET() {
   try {
     const items = await supabaseHelpers.getConnectivityItems();
-    return NextResponse.json(items);
+    
+    // Ensure numeric values are properly converted from strings if needed
+    const processedItems = items?.map(item => ({
+      ...item,
+      cost: typeof item.cost === 'string' ? parseFloat(item.cost) : item.cost,
+      managerCost: typeof item.managerCost === 'string' ? parseFloat(item.managerCost) : item.managerCost,
+      userCost: typeof item.userCost === 'string' ? parseFloat(item.userCost) : item.userCost,
+      quantity: typeof item.quantity === 'string' ? parseInt(item.quantity) : item.quantity
+    })) || [];
+    
+    return NextResponse.json(processedItems);
   } catch (error) {
     console.error('Error reading connectivity config from Supabase:', error);
     return NextResponse.json({ error: 'Failed to read connectivity config' }, { status: 500 });

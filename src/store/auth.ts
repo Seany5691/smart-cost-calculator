@@ -132,8 +132,6 @@ export const useAuthStore = create<AuthState>()(
           
           // Sync to global storage for backward compatibility
           get().syncUsersToGlobalStorage();
-          
-          console.log('User added successfully to Supabase');
         } catch (error) {
           console.error('Error adding user:', error);
           throw error;
@@ -164,8 +162,6 @@ export const useAuthStore = create<AuthState>()(
           
           // Sync to global storage for backward compatibility
           get().syncUsersToGlobalStorage();
-          
-          console.log('User updated successfully in Supabase');
         } catch (error) {
           console.error('Error updating user:', error);
           throw error;
@@ -192,8 +188,6 @@ export const useAuthStore = create<AuthState>()(
           
           // Sync to global storage for backward compatibility
           get().syncUsersToGlobalStorage();
-          
-          console.log('User deleted successfully from Supabase');
         } catch (error) {
           console.error('Error deleting user:', error);
           throw error;
@@ -286,7 +280,6 @@ export const useAuthStore = create<AuthState>()(
             // Validate data before saving
             if (validateUserData(globalData)) {
               localStorage.setItem(GLOBAL_USERS_KEY, JSON.stringify(globalData));
-              console.log('Users synced to global storage successfully');
             } else {
               console.error('Invalid user data, not syncing to global storage');
             }
@@ -306,7 +299,6 @@ export const useAuthStore = create<AuthState>()(
               // Validate the loaded data
               if (validateUserData(parsed)) {
                 set({ users: parsed.users });
-                console.log('Users loaded from global storage successfully');
                 return true;
               } else {
                 console.warn('Invalid user data in global storage, using defaults');
@@ -327,7 +319,6 @@ export const useAuthStore = create<AuthState>()(
           if (response.ok) {
             const users = await response.json();
             set({ users });
-            console.log('Users loaded from Supabase successfully');
             return;
           }
         } catch (error) {
@@ -351,4 +342,21 @@ export const useAuthStore = create<AuthState>()(
       }),
     }
   )
-); 
+);
+
+// Optimized selectors for better performance
+// Use simple property access to avoid creating new objects on every render
+export const useAuthUser = () => useAuthStore((state) => state.user);
+export const useAuthStatus = () => useAuthStore((state) => state.isAuthenticated);
+export const useAuthUsers = () => useAuthStore((state) => state.users);
+
+// Individual action selectors to avoid object creation
+export const useAuthLogin = () => useAuthStore((state) => state.login);
+export const useAuthLogout = () => useAuthStore((state) => state.logout);
+export const useAuthCheckAuth = () => useAuthStore((state) => state.checkAuth);
+export const useAuthAddUser = () => useAuthStore((state) => state.addUser);
+export const useAuthUpdateUser = () => useAuthStore((state) => state.updateUser);
+export const useAuthDeleteUser = () => useAuthStore((state) => state.deleteUser);
+export const useAuthChangePassword = () => useAuthStore((state) => state.changePassword);
+export const useAuthResetPassword = () => useAuthStore((state) => state.resetPassword);
+export const useAuthInitializeUsers = () => useAuthStore((state) => state.initializeUsers); 

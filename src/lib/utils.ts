@@ -1,3 +1,11 @@
+import { Item } from "./types";
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
+
 export const formatCurrency = (amount: number): string => {
   return new Intl.NumberFormat('en-ZA', {
     style: 'currency',
@@ -7,12 +15,6 @@ export const formatCurrency = (amount: number): string => {
   }).format(amount);
 };
 
-export const formatNumber = (num: number, decimals: number = 2): string => {
-  return new Intl.NumberFormat('en-ZA', {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  }).format(num);
-};
 
 export const generateId = (): string => {
   // Generate a proper UUID v4
@@ -106,39 +108,77 @@ export const calculateSettlement = (
 };
 
 export const getFactorForDeal = (
-  factors: Record<string, unknown>,
+  factors: any,
   term: number,
   escalation: number,
-  financeAmount: number
+  financeAmount: number,
+  userRole: 'admin' | 'manager' | 'user' = 'user'
 ): number => {
   const termKey = `${term}_months`;
   const escalationKey = `${escalation}%`;
   
-  if (!factors[termKey] || !factors[termKey][escalationKey]) {
-    return 0;
+  // Check if this is the enhanced factor structure
+  if (factors.userFactors || factors.managerFactors || factors.cost) {
+    // Enhanced structure - select the appropriate factor table based on user role
+    let factorTable: any;
+    
+    // CRITICAL: Admin and Manager should BOTH use managerFactors
+    if (userRole === 'admin' || userRole === 'manager') {
+      factorTable = factors.managerFactors;
+    } else {
+      // Regular users use userFactors
+      factorTable = factors.userFactors;
+    }
+    
+    // Fallback to legacy structure if role-specific factors don't exist
+    if (!factorTable || !factorTable[termKey] || !factorTable[termKey][escalationKey]) {
+      // Try the old structure as fallback
+      if (factors[termKey] && factors[termKey][escalationKey]) {
+        factorTable = factors;
+      } else {
+        return 0;
+      }
+    }
+    
+    const factorData = factorTable[termKey][escalationKey];
+    const ranges = Object.keys(factorData).map(range => {
+      const [min, max] = range.split('-').map(Number);
+      return { min, max: isNaN(max) ? Infinity : max, factor: factorData[range] };
+    });
+
+    // Find the appropriate range for the finance amount
+    const range = ranges.find(r => 
+      financeAmount >= (r.min || 0) && financeAmount <= (r.max || Infinity)
+    );
+
+    return range ? range.factor : 0;
+  } else {
+    // Legacy structure - use the old logic
+    if (!factors[termKey] || !factors[termKey][escalationKey]) {
+      return 0;
+    }
+
+    const factorData = factors[termKey][escalationKey];
+    const ranges = Object.keys(factorData).map(range => {
+      const [min, max] = range.split('-').map(Number);
+      return { min, max: isNaN(max) ? Infinity : max, factor: factorData[range] };
+    });
+
+    // Find the appropriate range for the finance amount
+    const range = ranges.find(r => 
+      financeAmount >= (r.min || 0) && financeAmount <= (r.max || Infinity)
+    );
+
+    return range ? range.factor : 0;
   }
-
-  const factorData = factors[termKey][escalationKey];
-  const ranges = Object.keys(factorData).map(range => {
-    const [min, max] = range.split('-').map(Number);
-    return { min, max, factor: factorData[range] };
-  });
-
-  // Find the appropriate range for the finance amount
-  const range = ranges.find(r => 
-    financeAmount >= (r.min || 0) && financeAmount <= (r.max || Infinity)
-  );
-
-  return range ? range.factor : 0;
 };
 
 export const getDistanceBandCost = (
-  scales: Record<string, unknown>,
-  distance: number,
-  userRole: 'admin' | 'manager' | 'user' = 'user'
+  scales: any,
+  distance: number
 ): number => {
   // Calculate distance cost based on kilometers
-  return distance * scales.additional_costs.cost_per_kilometer;
+  return distance * (scales.additional_costs?.cost_per_kilometer || 0);
 };
 
 export const getItemCost = (
@@ -146,26 +186,27 @@ export const getItemCost = (
   userRole: 'admin' | 'manager' | 'user' = 'user'
 ): number => {
   let selectedCost: number;
-  let costType: string;
   
   // Admin and Manager should use managerCost
   if ((userRole === 'admin' || userRole === 'manager') && item.managerCost !== undefined && item.managerCost !== null) {
     selectedCost = item.managerCost;
-    costType = 'managerCost';
   } 
   // User should use userCost
   else if (userRole === 'user' && item.userCost !== undefined && item.userCost !== null) {
     selectedCost = item.userCost;
-    costType = 'userCost';
   } 
   // Fallback to regular cost if specific pricing is not available
   else {
     selectedCost = item.cost;
-    costType = 'cost';
   }
   
-  // Debug logging for pricing selection
-  console.log(`Item: ${item.name}, Role: ${userRole}, Using: ${costType} = ${selectedCost}`);
+  // Ensure we return a number, not a string
+  const finalCost = typeof selectedCost === 'string' ? parseFloat(selectedCost) : selectedCost;
   
-  return selectedCost;
+  if (isNaN(finalCost)) {
+    console.error(`[ERROR] Invalid cost for item ${item.name}: ${selectedCost}`);
+    return 0;
+  }
+  
+  return finalCost;
 }; 

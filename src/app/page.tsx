@@ -4,7 +4,8 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth';
 import Link from 'next/link';
-import { Calculator, Settings, FileText, Users, TrendingUp, DollarSign, Target, ArrowRight, Clock, FolderOpen } from 'lucide-react';
+import { Calculator, Settings, FileText, Users, ArrowRight, Clock, FolderOpen, Sparkles, TrendingUp } from 'lucide-react';
+import { AnimatedBackground, GlassCard, GradientText, StatCard } from '@/components/ui/modern';
 
 export default function DashboardPage() {
   const { user, checkAuth } = useAuthStore();
@@ -70,61 +71,106 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto px-4 py-8 relative">
+      {/* Animated Background */}
+      <AnimatedBackground />
+      
       {/* Welcome Section */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold gradient-text mb-2">
-          Welcome back, {user.name}!
-        </h1>
-        <p className="text-gray-600">
+      <div className="mb-8 animate-fade-in-up relative z-10">
+        <div className="flex items-center space-x-3 mb-2">
+          <h1 className="text-4xl font-bold">
+            <GradientText animated gradient="rainbow">
+              Welcome back, {user.name}!
+            </GradientText>
+          </h1>
+          <Sparkles className="w-8 h-8 text-yellow-500 animate-pulse" />
+        </div>
+        <p className="text-gray-600 text-lg">
           Ready to calculate some deals? Here's what you can do today.
         </p>
       </div>
 
+      {/* Stats Overview */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 relative z-10">
+        <StatCard
+          label="Total Deals"
+          value={0}
+          icon={FileText}
+          trend={0}
+          animated
+          className="animate-fade-in-up"
+          style={{ animationDelay: '0.1s' } as React.CSSProperties}
+        />
+        <StatCard
+          label="Active Projects"
+          value={0}
+          icon={TrendingUp}
+          trend={0}
+          animated
+          className="animate-fade-in-up"
+          style={{ animationDelay: '0.2s' } as React.CSSProperties}
+        />
+        <StatCard
+          label="Calculations"
+          value={0}
+          icon={Calculator}
+          trend={0}
+          animated
+          className="animate-fade-in-up"
+          style={{ animationDelay: '0.3s' } as React.CSSProperties}
+        />
+      </div>
+
       {/* Quick Actions Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8 relative z-10">
         {quickActions.map((action, index) => {
           const Icon = action.icon;
           return (
             <Link
               key={index}
               href={action.href}
-              className="card hover:shadow-lg transition-all duration-200 group"
+              className="block animate-fade-in-up"
+              style={{ animationDelay: `${0.4 + index * 0.1}s` }}
             >
-              <div className="flex items-start space-x-4">
-                <div className={`p-3 rounded-lg ${action.color} text-white`}>
-                  <Icon className="w-6 h-6" />
+              <GlassCard className="h-full p-6">
+                <div className="flex items-start space-x-4">
+                  <div className={`p-3 rounded-xl ${action.color} text-white shadow-lg group-hover:scale-110 transition-transform duration-300`}>
+                    <Icon className="w-6 h-6" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent group-hover:from-blue-600 group-hover:to-purple-600 transition-all duration-300">
+                      {action.title}
+                    </h3>
+                    <p className="text-gray-600 text-sm mt-1">
+                      {action.description}
+                    </p>
+                  </div>
+                  <ArrowRight className={`w-5 h-5 ${action.textColor} opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-300`} />
                 </div>
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
-                    {action.title}
-                  </h3>
-                  <p className="text-gray-600 text-sm mt-1">
-                    {action.description}
-                  </p>
-                </div>
-                <ArrowRight className={`w-5 h-5 ${action.textColor} opacity-0 group-hover:opacity-100 transition-opacity`} />
-              </div>
+              </GlassCard>
             </Link>
           );
         })}
       </div>
 
-
-
       {/* Recent Activity Section */}
-      <div className="mt-8">
+      <div className="mt-8 relative z-10 animate-fade-in-up" style={{ animationDelay: '1s' }}>
         <div className="flex items-center space-x-2 mb-4">
-          <Clock className="w-5 h-5 text-gray-400" />
-          <h2 className="text-lg font-semibold text-gray-900">Recent Activity</h2>
+          <Clock className="w-5 h-5 text-purple-500 animate-pulse" />
+          <h2 className="text-2xl font-semibold">
+            <GradientText>Recent Activity</GradientText>
+          </h2>
         </div>
         
-        <div className="card">
-          <div className="text-center py-8">
-            <Clock className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-            <p className="text-gray-500">No recent activity to display</p>
+        <GlassCard className="p-6">
+          <div className="text-center py-12">
+            <div className="inline-flex p-4 bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl mb-4">
+              <Clock className="w-12 h-12 text-gray-400" />
+            </div>
+            <p className="text-gray-500 text-lg">No recent activity to display</p>
+            <p className="text-gray-400 text-sm mt-2">Your activity will appear here once you start using the calculator</p>
           </div>
-        </div>
+        </GlassCard>
       </div>
     </div>
   );

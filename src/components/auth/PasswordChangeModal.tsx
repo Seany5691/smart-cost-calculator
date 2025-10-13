@@ -3,6 +3,10 @@
 import { useState } from 'react';
 import { useAuthStore } from '@/store/auth';
 import { Lock, Eye, EyeOff, CheckCircle } from 'lucide-react';
+import { FormField } from '@/components/ui/FormField';
+import { Input } from '@/components/ui/Input';
+import { FormValidator, commonRules } from '@/lib/validation';
+import { toast, showValidationErrors } from '@/lib/toast';
 
 interface PasswordChangeModalProps {
   isOpen: boolean;
@@ -18,40 +22,58 @@ export default function PasswordChangeModal({ isOpen, onClose }: PasswordChangeM
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   if (!isOpen || !user) return null;
 
+  const validateField = (field: string, value: string) => {
+    let validationError = '';
+    
+    switch (field) {
+      case 'currentPassword':
+        if (!value) {
+          validationError = 'Current password is required';
+        } else if (value !== user?.password) {
+          validationError = 'Current password is incorrect';
+        }
+        break;
+      case 'newPassword':
+        const passwordResult = FormValidator.validate(value, commonRules.password);
+        if (!passwordResult.isValid) {
+          validationError = passwordResult.error || '';
+        } else if (value === currentPassword) {
+          validationError = 'New password must be different from current password';
+        }
+        break;
+      case 'confirmPassword':
+        if (!value) {
+          validationError = 'Please confirm your new password';
+        } else if (value !== newPassword) {
+          validationError = 'Passwords do not match';
+        }
+        break;
+    }
+
+    setFieldErrors(prev => ({
+      ...prev,
+      [field]: validationError
+    }));
+
+    return !validationError;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
     setIsLoading(true);
 
-    // Validate current password
-    if (currentPassword !== user.password) {
-      setError('Current password is incorrect');
-      setIsLoading(false);
-      return;
-    }
+    // Validate all fields
+    const isCurrentPasswordValid = validateField('currentPassword', currentPassword);
+    const isNewPasswordValid = validateField('newPassword', newPassword);
+    const isConfirmPasswordValid = validateField('confirmPassword', confirmPassword);
 
-    // Validate new password
-    if (newPassword.length < 6) {
-      setError('New password must be at least 6 characters long');
-      setIsLoading(false);
-      return;
-    }
-
-    // Validate password confirmation
-    if (newPassword !== confirmPassword) {
-      setError('New passwords do not match');
-      setIsLoading(false);
-      return;
-    }
-
-    // Validate that new password is different from current
-    if (newPassword === currentPassword) {
-      setError('New password must be different from current password');
+    if (!isCurrentPasswordValid || !isNewPasswordValid || !isConfirmPasswordValid) {
+      showValidationErrors(fieldErrors);
       setIsLoading(false);
       return;
     }
@@ -59,15 +81,17 @@ export default function PasswordChangeModal({ isOpen, onClose }: PasswordChangeM
     try {
       await changePassword(user.id, newPassword);
       setSuccess(true);
+      toast.success('Password Changed', 'Your password has been successfully updated.');
       setTimeout(() => {
         onClose();
         setSuccess(false);
         setCurrentPassword('');
         setNewPassword('');
         setConfirmPassword('');
+        setFieldErrors({});
       }, 2000);
-    } catch (error) {
-      setError('Failed to change password. Please try again.');
+    } catch {
+      toast.error('Change Failed', 'Failed to change password. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -92,76 +116,100 @@ export default function PasswordChangeModal({ isOpen, onClose }: PasswordChangeM
               <p className="text-gray-600">Please set a new password for your account.</p>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {error && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-                  {error}
-                </div>
-              )}
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <FormField
+                label="Current Password"
+                required
+                error={fieldErrors.currentPassword}
+              >
+                <Input
+                  type={showCurrentPassword ? 'text' : 'password'}
+                  value={currentPassword}
+                  onChange={(e) => {
+                    setCurrentPassword(e.target.value);
+                    if (fieldErrors.currentPassword) {
+                      validateField('currentPassword', e.target.value);
+                    }
+                  }}
+                  onBlur={() => validateField('currentPassword', currentPassword)}
+                  placeholder="Enter current password"
+                  isInvalid={!!fieldErrors.currentPassword}
+                  rightIcon={
+                    <button
+                      type="button"
+                      onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                      className="text-gray-400 hover:text-gray-600"
+                    >
+                      {showCurrentPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  }
+                  required
+                />
+              </FormField>
 
-              <div>
-                <label className="label">Current Password</label>
-                <div className="relative">
-                  <input
-                    type={showCurrentPassword ? 'text' : 'password'}
-                    value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
-                    className="input pr-10"
-                    placeholder="Enter current password"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  >
-                    {showCurrentPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                  </button>
-                </div>
-              </div>
+              <FormField
+                label="New Password"
+                required
+                description="Must be at least 6 characters long"
+                error={fieldErrors.newPassword}
+              >
+                <Input
+                  type={showNewPassword ? 'text' : 'password'}
+                  value={newPassword}
+                  onChange={(e) => {
+                    setNewPassword(e.target.value);
+                    if (fieldErrors.newPassword) {
+                      validateField('newPassword', e.target.value);
+                    }
+                    if (confirmPassword && fieldErrors.confirmPassword) {
+                      validateField('confirmPassword', confirmPassword);
+                    }
+                  }}
+                  onBlur={() => validateField('newPassword', newPassword)}
+                  placeholder="Enter new password"
+                  isInvalid={!!fieldErrors.newPassword}
+                  rightIcon={
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      className="text-gray-400 hover:text-gray-600"
+                    >
+                      {showNewPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  }
+                  required
+                />
+              </FormField>
 
-              <div>
-                <label className="label">New Password</label>
-                <div className="relative">
-                  <input
-                    type={showNewPassword ? 'text' : 'password'}
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    className="input pr-10"
-                    placeholder="Enter new password"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowNewPassword(!showNewPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  >
-                    {showNewPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                  </button>
-                </div>
-                <p className="text-xs text-gray-500 mt-1">Must be at least 6 characters long</p>
-              </div>
-
-              <div>
-                <label className="label">Confirm New Password</label>
-                <div className="relative">
-                  <input
-                    type={showConfirmPassword ? 'text' : 'password'}
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="input pr-10"
-                    placeholder="Confirm new password"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  >
-                    {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                  </button>
-                </div>
-              </div>
+              <FormField
+                label="Confirm New Password"
+                required
+                error={fieldErrors.confirmPassword}
+              >
+                <Input
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  value={confirmPassword}
+                  onChange={(e) => {
+                    setConfirmPassword(e.target.value);
+                    if (fieldErrors.confirmPassword) {
+                      validateField('confirmPassword', e.target.value);
+                    }
+                  }}
+                  onBlur={() => validateField('confirmPassword', confirmPassword)}
+                  placeholder="Confirm new password"
+                  isInvalid={!!fieldErrors.confirmPassword}
+                  rightIcon={
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="text-gray-400 hover:text-gray-600"
+                    >
+                      {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  }
+                  required
+                />
+              </FormField>
 
               <div className="flex space-x-3 pt-4">
                 <button

@@ -18,7 +18,6 @@ export interface ProposalGeneratorRef {
 
 const ProposalGenerator = forwardRef<ProposalGeneratorRef, ProposalGeneratorProps>(({ onGenerate }, ref) => {
   const { sections, dealDetails, calculateTotalCosts } = useCalculatorStore();
-  const { scales } = useConfigStore();
   const [isGenerating, setIsGenerating] = useState(false);
   const [toast, setToast] = useState<{ show: boolean; title: string; message: string; type: 'success' | 'error' }>({ 
     show: false, 
@@ -35,7 +34,6 @@ const ProposalGenerator = forwardRef<ProposalGeneratorRef, ProposalGeneratorProp
         // Dynamically import PDF-lib for form filling
         const { PDFDocument } = await import('pdf-lib');
         
-        // Fetch the PDF template
         const response = await fetch('/Proposal.pdf');
         if (!response.ok) {
           throw new Error('Failed to fetch PDF template');
@@ -217,7 +215,7 @@ const ProposalGenerator = forwardRef<ProposalGeneratorRef, ProposalGeneratorProp
         const filledPdfBytes = await pdfDoc.save();
         
         // Create download link
-        const blob = new Blob([filledPdfBytes], { type: 'application/pdf' });
+        const blob = new Blob([filledPdfBytes as BlobPart], { type: 'application/pdf' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;

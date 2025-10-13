@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseHelpers } from '@/lib/supabase';
-import { Scales } from '@/lib/types';
+import { Scales, EnhancedScales } from '@/lib/types';
 
 export async function GET() {
   try {
@@ -14,14 +14,14 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const scales: Scales = await request.json();
+    const scales: Scales | EnhancedScales = await request.json();
     
     // Validate the data
     if (!scales || typeof scales !== 'object') {
       return NextResponse.json({ error: 'Invalid data format' }, { status: 400 });
     }
 
-    // Save to Supabase
+    // Save to Supabase - the helper will handle both formats
     const savedScales = await supabaseHelpers.updateScales(scales);
     
     return NextResponse.json({ 

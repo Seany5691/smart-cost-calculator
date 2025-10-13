@@ -1,20 +1,20 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { Item, FactorData, Scales } from '@/lib/types';
+import { Item, FactorData, EnhancedFactorData, Scales, EnhancedScales } from '@/lib/types';
 
 interface ConfigState {
   hardware: Item[];
   connectivity: Item[];
   licensing: Item[];
-  factors: FactorData;
-  scales: Scales;
+  factors: FactorData | EnhancedFactorData;
+  scales: Scales | EnhancedScales;
   
   // Actions
   updateHardware: (items: Item[]) => Promise<void>;
   updateConnectivity: (items: Item[]) => Promise<void>;
   updateLicensing: (items: Item[]) => Promise<void>;
-  updateFactors: (factors: FactorData) => Promise<void>;
-  updateScales: (scales: Scales) => Promise<void>;
+  updateFactors: (factors: FactorData | EnhancedFactorData) => Promise<void>;
+  updateScales: (scales: Scales | EnhancedScales) => Promise<void>;
   
   // Load from API (read-only)
   loadFromAPI: () => Promise<void>;
@@ -54,16 +54,16 @@ const DEFAULT_HARDWARE: Item[] = [
 ];
 
 const DEFAULT_CONNECTIVITY: Item[] = [
-  { id: "conn1", name: "LTE", cost: 599, quantity: 0, displayOrder: 0 },
-  { id: "conn2", name: "Fibre", cost: 599, quantity: 0, displayOrder: 1 },
-  { id: "conn3", name: "Melon Sim Card", cost: 350, quantity: 0, displayOrder: 2 }
+  { id: "conn1", name: "LTE", cost: 599, managerCost: 599, userCost: 599, quantity: 0, displayOrder: 0 },
+  { id: "conn2", name: "Fibre", cost: 599, managerCost: 599, userCost: 599, quantity: 0, displayOrder: 1 },
+  { id: "conn3", name: "Melon Sim Card", cost: 350, managerCost: 350, userCost: 350, quantity: 0, displayOrder: 2 }
 ];
 
 const DEFAULT_LICENSING: Item[] = [
-  { id: "lic1", name: "Premium License", cost: 90, quantity: 0, displayOrder: 0 },
-  { id: "lic2", name: "Service Level Agreement (0 - 5 users)", cost: 299, quantity: 0, displayOrder: 1 },
-  { id: "lic3", name: "Service Level Agreement (6 - 10 users)", cost: 399, quantity: 0, displayOrder: 2 },
-  { id: "lic4", name: "Service Level Agreement (11 users or more)", cost: 499, quantity: 0, displayOrder: 3 }
+  { id: "lic1", name: "Premium License", cost: 90, managerCost: 90, userCost: 90, quantity: 0, displayOrder: 0 },
+  { id: "lic2", name: "Service Level Agreement (0 - 5 users)", cost: 299, managerCost: 299, userCost: 299, quantity: 0, displayOrder: 1 },
+  { id: "lic3", name: "Service Level Agreement (6 - 10 users)", cost: 399, managerCost: 399, userCost: 399, quantity: 0, displayOrder: 2 },
+  { id: "lic4", name: "Service Level Agreement (11 users or more)", cost: 499, managerCost: 499, userCost: 499, quantity: 0, displayOrder: 3 }
 ];
 
 const DEFAULT_FACTORS: FactorData = {
@@ -211,8 +211,6 @@ export const useConfigStore = create<ConfigState>()(
           
           // Sync to global storage for backward compatibility
           get().syncToGlobalStorage();
-          
-          console.log('Hardware config updated successfully');
         } catch (error) {
           console.error('Error updating hardware config:', error);
           throw error;
@@ -237,8 +235,6 @@ export const useConfigStore = create<ConfigState>()(
           
           // Sync to global storage for backward compatibility
           get().syncToGlobalStorage();
-          
-          console.log('Connectivity config updated successfully');
         } catch (error) {
           console.error('Error updating connectivity config:', error);
           throw error;
@@ -263,15 +259,13 @@ export const useConfigStore = create<ConfigState>()(
           
           // Sync to global storage for backward compatibility
           get().syncToGlobalStorage();
-          
-          console.log('Licensing config updated successfully');
         } catch (error) {
           console.error('Error updating licensing config:', error);
           throw error;
         }
       },
 
-      updateFactors: async (factors: FactorData) => {
+      updateFactors: async (factors: FactorData | EnhancedFactorData) => {
         try {
           // Update local state immediately
           set({ factors });
@@ -289,15 +283,13 @@ export const useConfigStore = create<ConfigState>()(
           
           // Sync to global storage for backward compatibility
           get().syncToGlobalStorage();
-          
-          console.log('Factors config updated successfully');
         } catch (error) {
           console.error('Error updating factors config:', error);
           throw error;
         }
       },
 
-      updateScales: async (scales: Scales) => {
+      updateScales: async (scales: Scales | EnhancedScales) => {
         try {
           // Update local state immediately
           set({ scales });
@@ -315,8 +307,6 @@ export const useConfigStore = create<ConfigState>()(
           
           // Sync to global storage for backward compatibility
           get().syncToGlobalStorage();
-          
-          console.log('Scales config updated successfully');
         } catch (error) {
           console.error('Error updating scales config:', error);
           throw error;
@@ -340,7 +330,6 @@ export const useConfigStore = create<ConfigState>()(
             // Validate data before saving
             if (validateConfigData(globalData)) {
               localStorage.setItem(GLOBAL_CONFIG_KEY, JSON.stringify(globalData));
-              console.log('Config synced to global storage successfully');
             } else {
               console.error('Invalid config data, not syncing to global storage');
             }
@@ -366,7 +355,6 @@ export const useConfigStore = create<ConfigState>()(
                   factors: parsed.factors || DEFAULT_FACTORS,
                   scales: parsed.scales || DEFAULT_SCALES
                 });
-                console.log('Config loaded from global storage successfully');
                 return true;
               } else {
                 console.warn('Invalid config data in global storage, using defaults');
@@ -382,7 +370,6 @@ export const useConfigStore = create<ConfigState>()(
 
       loadFromAPI: async () => {
         try {
-          console.log('Loading config from Supabase API...');
           
           // Always load from Supabase API first for real-time data
           // Only fall back to global storage if Supabase fails
@@ -396,13 +383,16 @@ export const useConfigStore = create<ConfigState>()(
             fetch('/api/config/scales')
           ]);
 
-          console.log('Supabase API responses:', {
-            hardware: hardwareRes.status,
-            connectivity: connectivityRes.status,
-            licensing: licensingRes.status,
-            factors: factorsRes.status,
-            scales: scalesRes.status
-          });
+          // Log any API failures
+          if (connectivityRes.status === 'rejected') {
+            console.error('Connectivity API failed:', connectivityRes.reason);
+          }
+          if (hardwareRes.status === 'rejected') {
+            console.error('Hardware API failed:', hardwareRes.reason);
+          }
+          if (licensingRes.status === 'rejected') {
+            console.error('Licensing API failed:', licensingRes.reason);
+          }
 
           let hardware = DEFAULT_HARDWARE;
           let connectivity = DEFAULT_CONNECTIVITY;
@@ -431,6 +421,7 @@ export const useConfigStore = create<ConfigState>()(
           if (connectivityRes.status === 'fulfilled' && connectivityRes.value.ok) {
             try {
               const apiConnectivity = await connectivityRes.value.json();
+              
               if (Array.isArray(apiConnectivity) && apiConnectivity.length > 0) {
                 // Sort by displayOrder, then by name
                 connectivity = apiConnectivity.sort((a, b) => {
@@ -476,16 +467,20 @@ export const useConfigStore = create<ConfigState>()(
           if (scalesRes.status === 'fulfilled' && scalesRes.value.ok) {
             try {
               const apiScales = await scalesRes.value.json();
-              if (apiScales && typeof apiScales === 'object' && apiScales.additional_costs) {
-                scales = apiScales;
+              if (apiScales && typeof apiScales === 'object') {
+                // Validate that we have the required structure
+                if (apiScales.additional_costs && 
+                    typeof apiScales.additional_costs.cost_per_kilometer === 'number' &&
+                    typeof apiScales.additional_costs.cost_per_point === 'number') {
+                  scales = apiScales;
+                } else {
+                  console.warn('Scales data missing required additional_costs, using defaults');
+                }
               }
             } catch (e) {
               console.warn('Invalid scales data from Supabase API, using defaults');
             }
           }
-
-          console.log('Final scales to be set:', scales);
-          console.log('Scales additional_costs:', scales?.additional_costs);
 
           set({
             hardware,
@@ -497,8 +492,6 @@ export const useConfigStore = create<ConfigState>()(
           
           // Sync the loaded data to global storage for backward compatibility
           get().syncToGlobalStorage();
-          
-          console.log('Config store updated successfully from Supabase');
         } catch (error) {
           console.error('Error loading config from Supabase API:', error);
           
@@ -530,4 +523,21 @@ export const useConfigStore = create<ConfigState>()(
       name: 'config-storage',
     }
   )
-); 
+);
+
+// Optimized selectors for better performance
+// Use simple property access to avoid creating new objects on every render
+export const useConfigHardware = () => useConfigStore((state) => state.hardware);
+export const useConfigConnectivity = () => useConfigStore((state) => state.connectivity);
+export const useConfigLicensing = () => useConfigStore((state) => state.licensing);
+export const useConfigFactors = () => useConfigStore((state) => state.factors);
+export const useConfigScales = () => useConfigStore((state) => state.scales);
+
+// Individual action selectors to avoid object creation
+export const useConfigUpdateHardware = () => useConfigStore((state) => state.updateHardware);
+export const useConfigUpdateConnectivity = () => useConfigStore((state) => state.updateConnectivity);
+export const useConfigUpdateLicensing = () => useConfigStore((state) => state.updateLicensing);
+export const useConfigUpdateFactors = () => useConfigStore((state) => state.updateFactors);
+export const useConfigUpdateScales = () => useConfigStore((state) => state.updateScales);
+export const useConfigLoadFromAPI = () => useConfigStore((state) => state.loadFromAPI);
+export const useConfigRefreshFromSupabase = () => useConfigStore((state) => state.refreshFromSupabase); 

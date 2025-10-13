@@ -16,12 +16,127 @@ function CalculatorPageContent() {
   const [tabIndex, setTabIndex] = useState(0);
   const [isInitializing, setIsInitializing] = useState(true);
   const [initError, setInitError] = useState<string | null>(null);
-  const [isLoadingDeal, setIsLoadingDeal] = useState(false);
+
   const [dealContext, setDealContext] = useState<{ originalUserRole: string; originalUsername: string } | null>(null);
+  const [showMainNav, setShowMainNav] = useState(false);
   const { isAuthenticated } = useAuthStore();
   const { initializeStore, loadDeal, resetDeal } = useCalculatorStore();
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  // Enhanced keyboard navigation support
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Only handle keyboard navigation if not typing in an input or select
+      if (event.target instanceof HTMLInputElement || 
+          event.target instanceof HTMLTextAreaElement || 
+          event.target instanceof HTMLSelectElement) {
+        return;
+      }
+      
+      // Prevent navigation if user is in a modal or dropdown
+      if (document.querySelector('[role="dialog"]') || document.querySelector('.dropdown-open')) {
+        return;
+      }
+      
+      if (event.key === 'ArrowLeft' && tabIndex > 0) {
+        event.preventDefault();
+        handlePrevTab();
+        // Show visual feedback
+        showNavigationFeedback('Previous step');
+      } else if (event.key === 'ArrowRight' && tabIndex < tabs.length - 1) {
+        event.preventDefault();
+        handleNextTab();
+      } else if (event.key >= '1' && event.key <= '6') {
+        event.preventDefault();
+        const targetIndex = parseInt(event.key) - 1;
+        if (targetIndex >= 0 && targetIndex < tabs.length && targetIndex <= tabIndex) {
+          setTabIndex(targetIndex);
+          showNavigationFeedback(`Jumped to ${tabs[targetIndex]?.name}`);
+        } else if (targetIndex > tabIndex) {
+          showNavigationFeedback('Complete previous steps first', 'warning');
+        }
+      } else if (event.key === 'Escape') {
+        // Quick exit to dashboard
+        event.preventDefault();
+        if (confirm('Are you sure you want to return to the dashboard? Any unsaved changes may be lost.')) {
+          router.push('/');
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [tabIndex, router]);
+
+  // Navigation feedback function
+  const showNavigationFeedback = (message: string, type: 'success' | 'warning' | 'info' = 'info') => {
+    const notification = document.createElement('div');
+    const bgColor = type === 'success' ? 'bg-green-100 border-green-400 text-green-700' :
+                   type === 'warning' ? 'bg-yellow-100 border-yellow-400 text-yellow-700' :
+                   'bg-blue-100 border-blue-400 text-blue-700';
+    
+    notification.className = `fixed top-20 left-1/2 transform -translate-x-1/2 ${bgColor} px-4 py-2 rounded-lg shadow-lg z-50 animate-slide-down`;
+    notification.innerHTML = `
+      <div class="flex items-center space-x-2">
+        <span class="text-sm font-medium">${message}</span>
+      </div>
+    `;
+    document.body.appendChild(notification);
+    
+    // Remove notification after 2 seconds
+    setTimeout(() => {
+      if (notification.parentNode) {
+        notification.style.animation = 'slideOut 0.3s ease-in forwards';
+        setTimeout(() => {
+          notification.remove();
+        }, 300);
+      }
+    }, 2000);
+  };
+
+  // Touch/swipe navigation for mobile
+  useEffect(() => {
+    let touchStartX = 0;
+    let touchEndX = 0;
+    
+    const handleTouchStart = (event: Event) => {
+      const touchEvent = event as TouchEvent;
+      touchStartX = touchEvent.changedTouches[0].screenX;
+    };
+    
+    const handleTouchEnd = (event: Event) => {
+      const touchEvent = event as TouchEvent;
+      touchEndX = touchEvent.changedTouches[0].screenX;
+      handleSwipe();
+    };
+    
+    const handleSwipe = () => {
+      const swipeThreshold = 50; // Minimum distance for a swipe
+      const swipeDistance = touchStartX - touchEndX;
+      
+      if (Math.abs(swipeDistance) > swipeThreshold) {
+        if (swipeDistance > 0 && tabIndex < tabs.length - 1) {
+          // Swipe left - go to next tab
+          handleNextTab();
+        } else if (swipeDistance < 0 && tabIndex > 0) {
+          // Swipe right - go to previous tab
+          handlePrevTab();
+        }
+      }
+    };
+    
+    const contentArea = document.querySelector('.calculator-content');
+    if (contentArea) {
+      contentArea.addEventListener('touchstart', handleTouchStart, { passive: true });
+      contentArea.addEventListener('touchend', handleTouchEnd, { passive: true });
+      
+      return () => {
+        contentArea.removeEventListener('touchstart', handleTouchStart);
+        contentArea.removeEventListener('touchend', handleTouchEnd);
+      };
+    }
+  }, [tabIndex]);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -48,7 +163,6 @@ function CalculatorPageContent() {
             
             if (configStore.scales?.additional_costs?.cost_per_kilometer && 
                 configStore.scales?.additional_costs?.cost_per_point) {
-              console.log('Calculator initialized successfully');
               setIsInitializing(false);
               
               // Check if we need to load a specific deal
@@ -56,7 +170,6 @@ function CalculatorPageContent() {
               const viewAsAdmin = searchParams.get('viewAsAdmin') === 'true';
               
               if (dealId) {
-                setIsLoadingDeal(true);
                 try {
                   const deal = await loadDeal(dealId);
                   if (deal && viewAsAdmin) {
@@ -68,8 +181,6 @@ function CalculatorPageContent() {
                 } catch (error) {
                   console.error('Error loading deal:', error);
                   setInitError('Failed to load the selected deal.');
-                } finally {
-                  setIsLoadingDeal(false);
                 }
               } else {
                 // Reset deal details for new deal
@@ -79,7 +190,6 @@ function CalculatorPageContent() {
               
               return;
             } else {
-              console.log(`Retry ${retries + 1}: Config store not ready, retrying...`);
               retries++;
               await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
             }
@@ -104,17 +214,91 @@ function CalculatorPageContent() {
     init();
   }, [isAuthenticated, router, initializeStore, searchParams, loadDeal]);
 
+  // Handle scroll behavior for main navigation
+  useEffect(() => {
+    let lastScrollY = 0;
+    let ticking = false;
+
+    const handleScroll = () => {
+      if (!ticking) {
+        requestAnimationFrame(() => {
+          const currentScrollY = window.scrollY;
+          
+          // Show navigation when at the very top (within 10px)
+          if (currentScrollY <= 10) {
+            setShowMainNav(true);
+          } 
+          // Hide navigation when scrolling down from top
+          else if (currentScrollY > lastScrollY && currentScrollY > 10) {
+            setShowMainNav(false);
+          }
+          
+          lastScrollY = currentScrollY;
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+
+    // Hide navigation by default when component mounts
+    setShowMainNav(false);
+    
+    // Apply initial transform to hide navigation
+    const nav = document.querySelector('nav');
+    if (nav) {
+      nav.style.transform = 'translateY(-100%)';
+      nav.style.transition = 'transform 0.3s ease-in-out';
+    }
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      // Reset navigation when leaving calculator
+      const nav = document.querySelector('nav');
+      if (nav) {
+        nav.style.transform = 'translateY(0)';
+      }
+    };
+  }, []);
+
+  // Update navigation visibility
+  useEffect(() => {
+    const nav = document.querySelector('nav');
+    if (nav) {
+      nav.style.transform = showMainNav ? 'translateY(0)' : 'translateY(-100%)';
+    }
+  }, [showMainNav]);
+
   if (!isAuthenticated) {
     return null;
   }
 
   if (isInitializing) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <h2 className="text-xl font-semibold text-gray-700 mb-2">Initializing Calculator...</h2>
-          <p className="text-gray-500">Please wait while we load the configuration data.</p>
+      <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
+        {/* Animated Background */}
+        <div className="fixed inset-0 -z-10">
+          <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50"></div>
+          <div className="absolute top-0 -left-4 w-96 h-96 bg-purple-300 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob"></div>
+          <div className="absolute top-0 -right-4 w-96 h-96 bg-yellow-300 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob" style={{ animationDelay: '2s' }}></div>
+          <div className="absolute -bottom-8 left-20 w-96 h-96 bg-pink-300 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob" style={{ animationDelay: '4s' }}></div>
+        </div>
+        
+        <div className="text-center relative z-10 bg-white/60 backdrop-blur-xl rounded-3xl p-12 shadow-2xl border border-white/40 animate-fade-in-up">
+          <div className="relative inline-block mb-6">
+            <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-200 border-t-blue-600 mx-auto"></div>
+            <div className="absolute inset-0 rounded-full bg-gradient-to-r from-blue-500/20 to-purple-500/20 blur-xl animate-pulse"></div>
+          </div>
+          <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-3">
+            Initializing Calculator...
+          </h2>
+          <p className="text-gray-600">Please wait while we load the configuration data.</p>
+          <div className="mt-6 flex items-center justify-center space-x-2">
+            <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0s' }}></div>
+            <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+            <div className="w-2 h-2 bg-pink-500 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+          </div>
         </div>
       </div>
     );
@@ -122,16 +306,28 @@ function CalculatorPageContent() {
 
   if (initError) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center">
-        <div className="text-center max-w-md mx-auto p-6">
-          <div className="text-red-500 text-4xl mb-4">⚠️</div>
-          <h2 className="text-xl font-semibold text-gray-700 mb-2">Initialization Error</h2>
-          <p className="text-gray-500 mb-4">{initError}</p>
+      <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
+        {/* Animated Background */}
+        <div className="fixed inset-0 -z-10">
+          <div className="absolute inset-0 bg-gradient-to-br from-red-50 via-orange-50 to-yellow-50"></div>
+          <div className="absolute top-0 -left-4 w-96 h-96 bg-red-300 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob"></div>
+          <div className="absolute top-0 -right-4 w-96 h-96 bg-orange-300 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob" style={{ animationDelay: '2s' }}></div>
+        </div>
+        
+        <div className="text-center max-w-md mx-auto p-8 relative z-10 bg-white/60 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/40 animate-shake">
+          <div className="inline-flex p-4 bg-gradient-to-br from-red-100 to-orange-100 rounded-2xl mb-4">
+            <div className="text-red-500 text-5xl animate-pulse">⚠️</div>
+          </div>
+          <h2 className="text-2xl font-bold bg-gradient-to-r from-red-600 to-orange-600 bg-clip-text text-transparent mb-3">
+            Initialization Error
+          </h2>
+          <p className="text-gray-600 mb-6">{initError}</p>
           <button
             onClick={() => window.location.reload()}
-            className="btn btn-primary"
+            className="relative overflow-hidden group bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold rounded-xl px-6 py-3 shadow-lg hover:shadow-glow-lg transform hover:scale-105 active:scale-95 transition-all duration-300"
           >
-            Refresh Page
+            <span className="relative z-10">Refresh Page</span>
+            <div className="absolute inset-0 bg-white/20 scale-0 group-active:scale-100 transition-transform duration-300 rounded-xl"></div>
           </button>
         </div>
       </div>
@@ -152,8 +348,81 @@ function CalculatorPageContent() {
   };
 
   const handleNextTab = () => {
+    // Validate current section before proceeding
+    let canProceed = true;
+    let validationMessage = '';
+    
+    if (tabIndex === 0) {
+      // Deal Details validation - check if required fields are filled
+      const { dealDetails } = useCalculatorStore.getState();
+      
+      if (!dealDetails.customerName.trim()) {
+        validationMessage = 'Please enter a customer name before proceeding.';
+        canProceed = false;
+      } else if (dealDetails.term <= 0) {
+        validationMessage = 'Please enter a valid contract term (greater than 0 months).';
+        canProceed = false;
+      } else if (dealDetails.escalation < 0) {
+        validationMessage = 'Please enter a valid escalation percentage (0% or higher).';
+        canProceed = false;
+      }
+    } else if (tabIndex === 4) {
+      // Settlement validation - check if settlement is calculated or manual amount is set
+      const { dealDetails } = useCalculatorStore.getState();
+      if (dealDetails.settlement === undefined || dealDetails.settlement < 0) {
+        validationMessage = 'Please set a valid settlement amount before proceeding to the final summary.';
+        canProceed = false;
+      }
+    }
+    
+    if (!canProceed) {
+      // Create a more user-friendly notification instead of alert
+      const notification = document.createElement('div');
+      notification.className = 'fixed top-20 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg shadow-lg z-50 animate-slide-down';
+      notification.innerHTML = `
+        <div class="flex items-center space-x-2">
+          <span class="text-lg">⚠️</span>
+          <span class="font-medium">${validationMessage}</span>
+        </div>
+      `;
+      document.body.appendChild(notification);
+      
+      // Remove notification after 4 seconds
+      setTimeout(() => {
+        if (notification.parentNode) {
+          notification.style.animation = 'slideOut 0.3s ease-in forwards';
+          setTimeout(() => {
+            notification.remove();
+          }, 300);
+        }
+      }, 4000);
+      
+      return;
+    }
+    
     if (tabIndex < tabs.length - 1) {
       setTabIndex(tabIndex + 1);
+      
+      // Show success feedback for progression
+      const successNotification = document.createElement('div');
+      successNotification.className = 'fixed top-20 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg shadow-lg z-50 animate-slide-down';
+      successNotification.innerHTML = `
+        <div class="flex items-center space-x-2">
+          <span class="text-lg">✅</span>
+          <span class="font-medium">Moved to ${tabs[tabIndex + 1]?.name}</span>
+        </div>
+      `;
+      document.body.appendChild(successNotification);
+      
+      // Remove notification after 2 seconds
+      setTimeout(() => {
+        if (successNotification.parentNode) {
+          successNotification.style.animation = 'slideOut 0.3s ease-in forwards';
+          setTimeout(() => {
+            successNotification.remove();
+          }, 300);
+        }
+      }, 2000);
     }
   };
 
@@ -164,92 +433,208 @@ function CalculatorPageContent() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-bold gradient-text mb-2">
-              Deal Cost Calculator
-            </h1>
-            <p className="text-gray-600">
-              Calculate comprehensive deal costs step by step
+    <div className="h-screen flex flex-col relative pt-0 overflow-hidden">
+      {/* Animated Background */}
+      <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50"></div>
+        <div className="absolute top-0 -left-4 w-96 h-96 bg-purple-300 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob"></div>
+        <div className="absolute top-0 -right-4 w-96 h-96 bg-yellow-300 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob" style={{ animationDelay: '2s' }}></div>
+        <div className="absolute -bottom-8 left-20 w-96 h-96 bg-pink-300 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-blob" style={{ animationDelay: '4s' }}></div>
+        <div className="absolute inset-0 bg-gradient-to-t from-white/50 to-transparent"></div>
+      </div>
+
+      {/* Admin Context Message (if exists) */}
+      {dealContext && (
+        <div className="flex-shrink-0 bg-blue-500/10 backdrop-blur-md border-b border-blue-200/50 animate-slide-down">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+            <p className="text-sm text-blue-800 flex items-center space-x-2">
+              <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></span>
+              <strong>Viewing as Admin:</strong> 
+              <span>This deal was created by {dealContext.originalUsername} ({dealContext.originalUserRole} pricing)</span>
             </p>
-            {dealContext && (
-              <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm text-blue-800">
-                  <strong>Viewing as Admin:</strong> This deal was created by {dealContext.originalUsername} ({dealContext.originalUserRole} pricing)
-                </p>
-              </div>
-            )}
           </div>
-          <button
-            onClick={() => router.push('/')}
-            className="btn btn-outline flex items-center space-x-2"
-          >
-            <ChevronLeft className="w-4 h-4" />
-            <span>Back to Dashboard</span>
-          </button>
+        </div>
+      )}
+
+      {/* Enhanced Fixed Tabs and Navigation Container - Glassmorphism */}
+      <div className="flex-shrink-0 bg-white/80 backdrop-blur-xl shadow-2xl border-b border-white/20 z-50 relative">
+        {/* Gradient overlay */}
+        <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 via-purple-500/5 to-pink-500/5 pointer-events-none"></div>
+        {/* Futuristic Tabs with Glassmorphism - Mobile Responsive */}
+        <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 relative">
+          <div className="flex items-center justify-between border-b border-white/20">
+            <div className="flex overflow-x-auto overflow-y-visible scrollbar-hide flex-1">
+              {tabs.map((tab, index) => {
+                const isCompleted = index < tabIndex;
+                const isCurrent = index === tabIndex;
+                const isFuture = index > tabIndex;
+                
+                return (
+                  <button
+                    key={index}
+                    onClick={() => handleTabChange(index)}
+                    className={`flex items-center space-x-1 sm:space-x-2 px-3 sm:px-5 py-3 sm:py-3.5 font-semibold text-xs sm:text-sm whitespace-nowrap transition-all duration-500 border-b-3 relative group cursor-pointer touch-manipulation min-w-[70px] sm:min-w-0 ${
+                      isCurrent
+                        ? 'text-blue-600 border-blue-600 bg-gradient-to-br from-blue-50/80 to-indigo-50/80 backdrop-blur-sm shadow-lg transform scale-110'
+                        : isCompleted
+                        ? 'text-green-600 border-green-500 bg-gradient-to-br from-green-50/60 to-emerald-50/60 backdrop-blur-sm hover:shadow-lg hover:transform hover:scale-105'
+                        : isFuture
+                        ? 'text-gray-500 border-transparent hover:text-gray-700 hover:bg-white/40 hover:backdrop-blur-sm hover:transform hover:scale-105'
+                        : 'text-gray-500 hover:text-gray-700 hover:bg-white/40 hover:backdrop-blur-sm border-transparent hover:transform hover:scale-105'
+                    }`}
+                  >
+                    <span className={`text-lg sm:text-xl transition-all duration-300 ${
+                      isCurrent ? 'scale-125 animate-bounce-subtle' : isCompleted ? 'scale-110' : ''
+                    }`}>
+                      {isCompleted ? '✅' : isCurrent ? '🔄' : tab.icon}
+                    </span>
+                    <span className="hidden md:inline">{tab.name}</span>
+                    <span className="md:hidden text-[10px] sm:text-xs font-bold">{tab.name.split(' ')[0]}</span>
+                    
+                    {/* Futuristic Active Indicator */}
+                    {isCurrent && (
+                      <>
+                        <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-3 h-3 sm:w-4 sm:h-4 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full animate-pulse shadow-glow-md pointer-events-none"></div>
+                        <div className="absolute inset-0 bg-gradient-to-br from-blue-200/30 to-purple-200/30 rounded-t-xl animate-pulse pointer-events-none"></div>
+                        <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10 blur-xl rounded-t-xl pointer-events-none"></div>
+                      </>
+                    )}
+                    
+                    {/* Completed glow */}
+                    {isCompleted && (
+                      <div className="absolute inset-0 bg-gradient-to-br from-green-200/20 to-emerald-200/20 rounded-t-xl pointer-events-none"></div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            
+            {/* Futuristic Back Button - Mobile Optimized */}
+            <button
+              onClick={() => router.push('/')}
+              className="relative overflow-hidden group ml-2 sm:ml-4 flex-shrink-0 px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl font-medium text-xs sm:text-sm bg-white/60 backdrop-blur-sm border border-white/40 hover:bg-white/80 hover:shadow-xl transition-all duration-300 transform hover:scale-105 active:scale-95 flex items-center space-x-1 sm:space-x-2"
+            >
+              <ChevronLeft className="w-3 h-3 sm:w-4 sm:h-4 group-hover:animate-bounce" />
+              <span className="hidden md:inline">Dashboard</span>
+              <span className="md:hidden text-xs">Back</span>
+              <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+            </button>
+          </div>
         </div>
 
-        {/* Calculator Container */}
-        <div className="card-gradient">
-          {/* Tabs */}
-          <div className="border-b border-gray-200 mb-6">
-            <div className="flex overflow-x-auto">
-              {tabs.map((tab, index) => (
-                <button
-                  key={index}
-                  onClick={() => handleTabChange(index)}
-                  className={`flex items-center space-x-2 px-6 py-4 font-medium text-sm whitespace-nowrap transition-all duration-200 ${
-                    tabIndex === index
-                      ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
-                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-                  }`}
-                >
-                  <span className="text-lg">{tab.icon}</span>
-                  <span>{tab.name}</span>
-                </button>
-              ))}
+        {/* Futuristic Navigation Bar with Glassmorphism - Mobile Optimized */}
+        <div className="bg-gradient-to-r from-blue-50/80 to-purple-50/80 backdrop-blur-sm border-t border-white/30 relative">
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-purple-500/5"></div>
+          <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-3 sm:py-4 relative">
+            <div className="flex justify-between items-center gap-2 sm:gap-4">
+              {/* Futuristic Previous Button - Mobile Optimized */}
+              <div className="flex-1 min-w-0">
+                {tabIndex > 0 ? (
+                  <button 
+                    onClick={handlePrevTab}
+                    className="relative overflow-hidden group bg-white/60 backdrop-blur-sm border border-white/40 hover:bg-white/80 hover:shadow-xl transition-all duration-300 transform hover:scale-105 active:scale-95 rounded-xl px-3 sm:px-5 py-2 sm:py-3 flex items-center space-x-2 sm:space-x-3 w-full sm:w-auto justify-center sm:justify-start"
+                  >
+                    <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5 group-hover:animate-bounce flex-shrink-0 text-blue-600" />
+                    <div className="flex flex-col items-start min-w-0">
+                      <span className="text-[10px] sm:text-xs text-gray-500 hidden sm:block font-medium">Previous</span>
+                      <span className="hidden md:inline font-semibold text-gray-700 truncate">{tabs[tabIndex - 1]?.name}</span>
+                      <span className="md:hidden font-semibold text-gray-700">Back</span>
+                    </div>
+                    <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                  </button>
+                ) : (
+                  <div className="text-xs sm:text-sm text-gray-400 italic hidden sm:flex items-center space-x-2 px-4">
+                    <span className="w-2 h-2 bg-gray-300 rounded-full"></span>
+                    <span>Start of workflow</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Futuristic Progress Indicator - Mobile Optimized */}
+              <div className="flex items-center space-x-2 sm:space-x-4 flex-shrink-0">
+                {/* Glassmorphism Step Counter */}
+                <div className="bg-white/80 backdrop-blur-sm rounded-full px-3 sm:px-4 py-2 shadow-lg border border-white/40 flex items-center space-x-2 sm:space-x-3">
+                  <span className="text-xs sm:text-base text-gray-700 font-bold whitespace-nowrap">
+                    {tabIndex + 1}/{tabs.length}
+                  </span>
+                  <span className="text-xs sm:text-sm font-extrabold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent hidden sm:inline">
+                    • {Math.round(((tabIndex + 1) / tabs.length) * 100)}%
+                  </span>
+                </div>
+                
+                {/* Futuristic Progress Bar - Hidden on mobile */}
+                <div className="w-20 sm:w-40 h-2 sm:h-3 bg-white/40 backdrop-blur-sm rounded-full overflow-hidden shadow-inner border border-white/30 hidden md:block">
+                  <div 
+                    className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 transition-all duration-1000 ease-out relative"
+                    style={{ width: `${((tabIndex + 1) / tabs.length) * 100}%` }}
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-r from-white/30 to-transparent animate-shimmer"></div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Futuristic Next Button - Mobile Optimized */}
+              <div className="flex-1 flex justify-end min-w-0">
+                {tabIndex < tabs.length - 1 ? (
+                  <button
+                    onClick={handleNextTab}
+                    className="relative overflow-hidden group bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold rounded-xl px-3 sm:px-6 py-2 sm:py-3 shadow-lg hover:shadow-glow-lg transform hover:scale-105 active:scale-95 transition-all duration-300 flex items-center space-x-2 sm:space-x-3 w-full sm:w-auto justify-center sm:justify-end"
+                  >
+                    <div className="flex flex-col items-end min-w-0 relative z-10">
+                      <span className="text-[10px] sm:text-xs text-white/80 hidden sm:block font-medium">Next</span>
+                      <span className="hidden md:inline font-bold truncate">{tabs[tabIndex + 1]?.name}</span>
+                      <span className="md:hidden font-bold">Next</span>
+                    </div>
+                    <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 group-hover:animate-bounce flex-shrink-0 relative z-10" />
+                    
+                    {/* Ripple effect */}
+                    <div className="absolute inset-0 bg-white/20 scale-0 group-active:scale-100 transition-transform duration-300 rounded-xl"></div>
+                    
+                    {/* Glow effect */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-blue-400/50 to-purple-400/50 blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                  </button>
+                ) : (
+                  <div className="relative overflow-hidden flex items-center space-x-2 sm:space-x-3 text-green-600 font-bold bg-gradient-to-r from-green-50 to-emerald-50 px-3 sm:px-6 py-2 sm:py-3 rounded-xl border-2 border-green-200 shadow-lg text-xs sm:text-base">
+                    <span className="hidden sm:inline">Workflow Complete!</span>
+                    <span className="sm:hidden">Done!</span>
+                    <span className="text-xl sm:text-2xl animate-bounce">🎉</span>
+                    <div className="absolute inset-0 bg-gradient-to-r from-green-200/20 to-emerald-200/20 animate-pulse"></div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-
-          {/* Tab Content */}
-          <div className="p-6">
-            {tabIndex === 0 && (
-              <DealDetailsSection onNext={handleNextTab} />
-            )}
-            {tabIndex === 1 && (
-              <HardwareSection onNext={handleNextTab} onPrev={handlePrevTab} />
-            )}
-            {tabIndex === 2 && (
-              <ConnectivitySection onNext={handleNextTab} onPrev={handlePrevTab} />
-            )}
-            {tabIndex === 3 && (
-              <LicensingSection onNext={handleNextTab} onPrev={handlePrevTab} />
-            )}
-            {tabIndex === 4 && (
-              <SettlementSection onNext={handleNextTab} onPrev={handlePrevTab} />
-            )}
-            {tabIndex === 5 && (
-              <TotalCostsSection onPrev={handlePrevTab} />
-            )}
-          </div>
         </div>
+      </div>
 
-        {/* Progress Indicator */}
-        <div className="mt-6">
-          <div className="flex items-center justify-between text-sm text-gray-600">
-            <span>Step {tabIndex + 1} of {tabs.length}</span>
-            <div className="flex space-x-1">
-              {tabs.map((_, index) => (
-                <div
-                  key={index}
-                  className={`w-2 h-2 rounded-full transition-all duration-200 ${
-                    index <= tabIndex ? 'bg-blue-600' : 'bg-gray-300'
-                  }`}
-                />
-              ))}
+      {/* Scrollable Content Area with Glassmorphism - Mobile Optimized */}
+      <div className="flex-1 overflow-y-auto calculator-content relative">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-6 lg:py-8">
+          <div className="relative bg-white/60 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/40 overflow-hidden">
+            {/* Gradient overlay */}
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-purple-500/5 to-pink-500/5 pointer-events-none"></div>
+            <div className="p-4 sm:p-6 lg:p-8 relative z-10">
+              {/* Section transition wrapper */}
+              <div className="animate-fade-in-up">
+                {tabIndex === 0 && (
+                  <DealDetailsSection onNext={() => {}} />
+                )}
+                {tabIndex === 1 && (
+                  <HardwareSection onNext={() => {}} onPrev={() => {}} />
+                )}
+                {tabIndex === 2 && (
+                  <ConnectivitySection onNext={() => {}} onPrev={() => {}} />
+                )}
+                {tabIndex === 3 && (
+                  <LicensingSection onNext={() => {}} onPrev={() => {}} />
+                )}
+                {tabIndex === 4 && (
+                  <SettlementSection onNext={() => {}} onPrev={() => {}} />
+                )}
+                {tabIndex === 5 && (
+                  <TotalCostsSection onPrev={() => {}} />
+                )}
+              </div>
             </div>
           </div>
         </div>

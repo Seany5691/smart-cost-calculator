@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth';
-import { Calculator, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { Calculator, Eye, EyeOff, AlertCircle, Sparkles } from 'lucide-react';
+import { AnimatedBackground, FloatingInput, MagneticButton, GradientText, GlassCard } from '@/components/ui/modern';
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
@@ -30,7 +31,7 @@ export default function LoginPage() {
       if (!success) {
         setError('Invalid username or password');
       }
-    } catch (err) {
+    } catch {
       setError('An error occurred during login');
     } finally {
       setIsLoading(false);
@@ -38,85 +39,75 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-4">
-      <div className="max-w-md w-full">
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Animated Background */}
+      <AnimatedBackground />
+      
+      <div className="max-w-md w-full relative z-10 animate-fade-in-up">
         {/* Logo and Title */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl mb-4 shadow-lg">
-            <Calculator className="w-8 h-8 text-white" />
+          <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600 rounded-3xl mb-4 shadow-glow-lg animate-float">
+            <Calculator className="w-10 h-10 text-white" />
           </div>
-          <h1 className="text-3xl font-bold gradient-text mb-2">
-            Smart Cost Calculator
+          <h1 className="text-4xl font-bold mb-2">
+            <GradientText animated gradient="rainbow">
+              Smart Cost Calculator
+            </GradientText>
           </h1>
-          <p className="text-gray-600">
-            Sign in to access your account
+          <p className="text-gray-600 flex items-center justify-center space-x-2">
+            <Sparkles className="w-4 h-4 text-purple-500" />
+            <span>Sign in to access your account</span>
+            <Sparkles className="w-4 h-4 text-purple-500" />
           </p>
         </div>
 
         {/* Login Form */}
-        <div className="glass-card p-8">
+        <GlassCard className="p-8 hover3D glow">
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Username Field */}
-            <div>
-              <label htmlFor="username" className="label">
-                Username
-              </label>
-              <input
-                id="username"
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="input"
-                placeholder="Enter your username"
-                required
-                disabled={isLoading}
-              />
-            </div>
+            <FloatingInput
+              label="Username"
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              disabled={isLoading}
+              required
+            />
 
-            {/* Password Field */}
-            <div>
-              <label htmlFor="password" className="label">
-                Password
-              </label>
-              <div className="relative">
-                <input
-                  id="password"
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="input pr-12"
-                  placeholder="Enter your password"
-                  required
-                  disabled={isLoading}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
-                  disabled={isLoading}
-                >
-                  {showPassword ? (
-                    <EyeOff className="w-5 h-5" />
-                  ) : (
-                    <Eye className="w-5 h-5" />
-                  )}
-                </button>
-              </div>
+            <div className="relative">
+              <FloatingInput
+                label="Password"
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={isLoading}
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors z-20"
+                disabled={isLoading}
+              >
+                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              </button>
             </div>
 
             {/* Error Message */}
             {error && (
-              <div className="flex items-center space-x-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700">
-                <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                <span className="text-sm">{error}</span>
+              <div className="flex items-center space-x-2 p-4 bg-red-50/80 backdrop-blur-sm border border-red-200 rounded-xl text-red-700 animate-shake">
+                <AlertCircle className="w-5 h-5 flex-shrink-0 animate-pulse" />
+                <span className="text-sm font-medium">{error}</span>
               </div>
             )}
 
             {/* Submit Button */}
-            <button
+            <MagneticButton
               type="submit"
               disabled={isLoading}
-              className="btn btn-primary w-full flex items-center justify-center space-x-2"
+              variant="primary"
+              size="lg"
+              glow
+              className="w-full"
             >
               {isLoading ? (
                 <>
@@ -124,17 +115,22 @@ export default function LoginPage() {
                   <span>Signing in...</span>
                 </>
               ) : (
-                <span>Sign In</span>
+                <>
+                  <span>Sign In</span>
+                  <span className="text-xl">→</span>
+                </>
               )}
-            </button>
+            </MagneticButton>
           </form>
 
-
-        </div>
+          {/* Decorative elements */}
+          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-blue-500/10 to-purple-500/10 rounded-full blur-3xl -z-10"></div>
+          <div className="absolute bottom-0 left-0 w-32 h-32 bg-gradient-to-tr from-pink-500/10 to-purple-500/10 rounded-full blur-3xl -z-10"></div>
+        </GlassCard>
 
         {/* Footer */}
-        <div className="text-center mt-8">
-          <p className="text-gray-500 text-sm">
+        <div className="text-center mt-8 animate-fade-in" style={{ animationDelay: '0.3s' }}>
+          <p className="text-gray-500 text-sm backdrop-blur-sm bg-white/30 rounded-full px-4 py-2 inline-block">
             © 2024 Smart Cost Calculator. All rights reserved.
           </p>
         </div>

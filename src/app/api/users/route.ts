@@ -16,8 +16,6 @@ export async function POST(request: NextRequest) {
   try {
     const user: User = await request.json();
     
-    console.log('Received user data:', user);
-    
     // Validate the data
     if (!user.username || !user.password || !user.name || !user.email) {
       const missingFields = [];

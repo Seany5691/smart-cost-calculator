@@ -1,16 +1,15 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useAuthStore } from '@/store/auth';
 import { User } from '@/lib/types';
 import { generateId } from '@/lib/utils';
-import { Plus, Trash2, Edit, Save, X, Check, Shield, User as UserIcon, Crown, Lock, Eye, EyeOff } from 'lucide-react';
+import { Plus, Trash2, Edit, X, Check, Shield, User as UserIcon, Crown, Lock, Eye, EyeOff } from 'lucide-react';
+import { toast } from '@/lib/toast';
 
 export default function UserManagement() {
   const { users, addUser, updateUser, deleteUser, resetPassword } = useAuthStore();
   const [editingUser, setEditingUser] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [resetPasswordUser, setResetPasswordUser] = useState<string | null>(null);
   const [newPassword, setNewPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -31,27 +30,20 @@ export default function UserManagement() {
       isActive: true,
       requiresPasswordChange: true
     });
-    setMessage(null);
   };
 
   const handleDeleteUser = async (id: string) => {
     const user = users.find(u => u.id === id);
     if (user?.username === 'Camryn') {
-      setMessage({ type: 'error', text: 'Cannot delete the default admin user (Camryn).' });
+      toast.error('Cannot Delete User', 'The default admin user (Camryn) cannot be deleted.');
       return;
     }
     
-    setIsLoading(true);
-    setMessage(null);
-    
     try {
       await deleteUser(id);
-      setMessage({ type: 'success', text: 'User deleted successfully from Supabase!' });
-    } catch (error) {
-      console.error('Error deleting user:', error);
-      setMessage({ type: 'error', text: 'Failed to delete user. Please try again.' });
-    } finally {
-      setIsLoading(false);
+      toast.success('User Deleted', 'User has been successfully removed from the system.');
+    } catch {
+      toast.error('Delete Failed', 'Failed to delete user. Please try again.');
     }
   };
 
@@ -71,7 +63,7 @@ export default function UserManagement() {
   const handleUpdateUser = (id: string, updates: Partial<User>) => {
     const user = users.find(u => u.id === id);
     if (user?.username === 'Camryn') {
-      setMessage({ type: 'error', text: 'Cannot edit the default admin user (Camryn).' });
+      toast.warning('Cannot Edit User', 'The default admin user (Camryn) cannot be modified.');
       return;
     }
     
@@ -80,9 +72,6 @@ export default function UserManagement() {
   };
 
   const handleSaveUser = async (id: string) => {
-    setIsLoading(true);
-    setMessage(null);
-    
     try {
       // Check if this is a new user or existing user
       const existingUser = users.find(u => u.id === id);
@@ -91,19 +80,19 @@ export default function UserManagement() {
         // Update existing user
         await updateUser(id, { 
           ...editingUserData, 
-          updatedAt: new Date().toISOString() 
+          updatedAt: new Date() 
         });
-        setMessage({ type: 'success', text: 'User updated successfully!' });
+        toast.success('User Updated', 'User information has been successfully updated.');
       } else {
         // Create new user
         const newUser: User = {
           ...editingUserData as User,
           id,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
+          createdAt: new Date(),
+          updatedAt: new Date()
         };
         await addUser(newUser);
-        setMessage({ type: 'success', text: 'User created successfully!' });
+        toast.success('User Created', 'New user has been successfully added to the system.');
       }
       
       // Small delay to ensure state updates properly
@@ -111,11 +100,8 @@ export default function UserManagement() {
         setEditingUser(null);
         setEditingUserData({});
       }, 100);
-    } catch (error) {
-      console.error('Error saving user:', error);
-      setMessage({ type: 'error', text: 'Failed to save user. Please try again.' });
-    } finally {
-      setIsLoading(false);
+    } catch {
+      toast.error('Save Failed', 'Failed to save user. Please try again.');
     }
   };
 
@@ -126,26 +112,22 @@ export default function UserManagement() {
 
   const handleConfirmResetPassword = async () => {
     if (!resetPasswordUser || !newPassword.trim()) {
-      setMessage({ type: 'error', text: 'Please enter a new password' });
+      toast.error('Validation Error', 'Please enter a new password.');
       return;
     }
 
     if (newPassword.length < 6) {
-      setMessage({ type: 'error', text: 'Password must be at least 6 characters long' });
+      toast.error('Validation Error', 'Password must be at least 6 characters long.');
       return;
     }
 
-    setIsLoading(true);
     try {
       await resetPassword(resetPasswordUser, newPassword);
       setResetPasswordUser(null);
       setNewPassword('');
-      setMessage({ type: 'success', text: 'Password reset successfully! User will be required to change password on next login.' });
-    } catch (error) {
-      console.error('Error resetting password:', error);
-      setMessage({ type: 'error', text: 'Failed to reset password. Please try again.' });
-    } finally {
-      setIsLoading(false);
+      toast.success('Password Reset', 'Password has been reset successfully. User will be required to change it on next login.');
+    } catch {
+      toast.error('Reset Failed', 'Failed to reset password. Please try again.');
     }
   };
 
@@ -183,19 +165,12 @@ export default function UserManagement() {
         <button
           onClick={handleAddUser}
           className="btn btn-primary flex items-center space-x-2"
+          aria-label="Add new user"
         >
-          <Plus className="w-4 h-4" />
+          <Plus className="w-4 h-4" aria-hidden="true" />
           <span>Add User</span>
         </button>
       </div>
-
-      {message && (
-        <div className={`p-4 rounded-lg ${
-          message.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-        }`}>
-          {message.text}
-        </div>
-      )}
 
       <div className="card">
         <div className="overflow-x-auto">
@@ -222,6 +197,7 @@ export default function UserManagement() {
                         value={editingUserData.name || ''}
                         onChange={(e) => handleUpdateUser(user.id, { name: e.target.value })}
                         className="input w-full"
+                        placeholder="Enter full name"
                       />
                     ) : (
                       <span className="font-medium">{user.name}</span>
@@ -234,6 +210,7 @@ export default function UserManagement() {
                         value={editingUserData.username || ''}
                         onChange={(e) => handleUpdateUser(user.id, { username: e.target.value })}
                         className="input w-full"
+                        placeholder="Enter username"
                         disabled={user.username === 'Camryn'}
                       />
                     ) : (
@@ -247,6 +224,7 @@ export default function UserManagement() {
                         value={editingUserData.email || ''}
                         onChange={(e) => handleUpdateUser(user.id, { email: e.target.value })}
                         className="input w-full"
+                        placeholder="user@company.com"
                       />
                     ) : (
                       <span>{user.email}</span>
@@ -302,10 +280,11 @@ export default function UserManagement() {
                       {user.username !== 'Camryn' && (
                         <button
                           onClick={() => handleResetPassword(user.id)}
-                          className="p-1 text-blue-600 hover:text-blue-800"
+                          className="p-1 text-blue-600 hover:text-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
                           title="Reset Password"
+                          aria-label={`Reset password for ${user.name}`}
                         >
-                          <Lock className="w-4 h-4" />
+                          <Lock className="w-4 h-4" aria-hidden="true" />
                         </button>
                       )}
                     </div>
@@ -316,31 +295,35 @@ export default function UserManagement() {
                         <>
                           <button
                             onClick={() => handleSaveUser(user.id)}
-                            className="p-1 text-green-600 hover:text-green-800"
+                            className="p-1 text-green-600 hover:text-green-800 focus:outline-none focus:ring-2 focus:ring-green-500 rounded"
+                            aria-label={`Save changes for ${user.name}`}
                           >
-                            <Check className="w-4 h-4" />
+                            <Check className="w-4 h-4" aria-hidden="true" />
                           </button>
                           <button
                             onClick={handleCancelEdit}
-                            className="p-1 text-gray-600 hover:text-gray-800"
+                            className="p-1 text-gray-600 hover:text-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-500 rounded"
+                            aria-label="Cancel editing"
                           >
-                            <X className="w-4 h-4" />
+                            <X className="w-4 h-4" aria-hidden="true" />
                           </button>
                         </>
                       ) : (
                         <>
                           <button
                             onClick={() => handleEditUser(user.id)}
-                            className="p-1 text-blue-600 hover:text-blue-800"
+                            className="p-1 text-blue-600 hover:text-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
+                            aria-label={`Edit ${user.name}`}
                           >
-                            <Edit className="w-4 h-4" />
+                            <Edit className="w-4 h-4" aria-hidden="true" />
                           </button>
                           {user.username !== 'Camryn' && (
                             <button
                               onClick={() => handleDeleteUser(user.id)}
-                              className="p-1 text-red-600 hover:text-red-800"
+                              className="p-1 text-red-600 hover:text-red-800 focus:outline-none focus:ring-2 focus:ring-red-500 rounded"
+                              aria-label={`Delete ${user.name}`}
                             >
-                              <Trash2 className="w-4 h-4" />
+                              <Trash2 className="w-4 h-4" aria-hidden="true" />
                             </button>
                           )}
                         </>
@@ -411,15 +394,17 @@ export default function UserManagement() {
                       <button
                         onClick={() => handleSaveUser(editingUser)}
                         disabled={!editingUserData.name || !editingUserData.username || !editingUserData.email}
-                        className="p-1 text-green-600 hover:text-green-800 disabled:text-gray-400"
+                        className="p-1 text-green-600 hover:text-green-800 disabled:text-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 rounded"
+                        aria-label="Save new user"
                       >
-                        <Check className="w-4 h-4" />
+                        <Check className="w-4 h-4" aria-hidden="true" />
                       </button>
                       <button
                         onClick={handleCancelEdit}
-                        className="p-1 text-gray-600 hover:text-gray-800"
+                        className="p-1 text-gray-600 hover:text-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-500 rounded"
+                        aria-label="Cancel adding user"
                       >
-                        <X className="w-4 h-4" />
+                        <X className="w-4 h-4" aria-hidden="true" />
                       </button>
                     </div>
                   </td>
@@ -443,13 +428,21 @@ export default function UserManagement() {
 
       {/* Password Reset Modal */}
       {resetPasswordUser && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="reset-password-title"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) handleCancelResetPassword();
+          }}
+        >
           <div className="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full mx-4">
             <div className="text-center mb-6">
               <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Lock className="w-8 h-8 text-blue-600" />
+                <Lock className="w-8 h-8 text-blue-600" aria-hidden="true" />
               </div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Reset Password</h2>
+              <h2 id="reset-password-title" className="text-2xl font-bold text-gray-900 mb-2">Reset Password</h2>
               <p className="text-gray-600">
                 Set a new temporary password for{' '}
                 <span className="font-semibold">
@@ -473,9 +466,10 @@ export default function UserManagement() {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
                   >
-                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    {showPassword ? <EyeOff className="w-5 h-5" aria-hidden="true" /> : <Eye className="w-5 h-5" aria-hidden="true" />}
                   </button>
                 </div>
                 <p className="text-xs text-gray-500 mt-1">Must be at least 6 characters long</p>

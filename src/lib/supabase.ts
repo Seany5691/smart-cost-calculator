@@ -53,7 +53,17 @@ export const supabaseHelpers = {
       .order('name');
     
     if (error) throw error;
-    return data;
+    
+    // Ensure proper type conversion for numeric fields
+    const processedData = data?.map(item => ({
+      ...item,
+      cost: typeof item.cost === 'string' ? parseFloat(item.cost) : item.cost,
+      managerCost: typeof item.managerCost === 'string' ? parseFloat(item.managerCost) : item.managerCost,
+      userCost: typeof item.userCost === 'string' ? parseFloat(item.userCost) : item.userCost,
+      quantity: typeof item.quantity === 'string' ? parseInt(item.quantity) : item.quantity
+    })) || [];
+    
+    return processedData;
   },
 
   async updateConnectivityItems(items: any[]) {
@@ -143,8 +153,37 @@ export const supabaseHelpers = {
       .limit(1)
       .single();
     
-    if (error) throw error;
-    return data?.scales_data || {};
+    // If no data found or error, return default scales
+    if (error || !data?.scales_data) {
+      return {
+        installation: {
+          "0-4": 3500,
+          "5-8": 3500,
+          "9-16": 7000,
+          "17-32": 10500,
+          "33+": 15000
+        },
+        finance_fee: {
+          "0-20000": 1800,
+          "20001-50000": 1800,
+          "50001-100000": 2800,
+          "100001+": 3800
+        },
+        gross_profit: {
+          "0-4": 10000,
+          "5-8": 15000,
+          "9-16": 20000,
+          "17-32": 25000,
+          "33+": 30000
+        },
+        additional_costs: {
+          cost_per_kilometer: 1.5,
+          cost_per_point: 750
+        }
+      };
+    }
+    
+    return data.scales_data;
   },
 
   async updateScales(scales: any) {

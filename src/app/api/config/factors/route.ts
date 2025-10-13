@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseHelpers } from '@/lib/supabase';
-import { FactorData } from '@/lib/types';
+import { FactorData, EnhancedFactorData } from '@/lib/types';
 
 export async function GET() {
   try {
@@ -14,14 +14,14 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const factors: FactorData = await request.json();
+    const factors: FactorData | EnhancedFactorData = await request.json();
     
     // Validate the data
     if (!factors || typeof factors !== 'object') {
       return NextResponse.json({ error: 'Invalid data format' }, { status: 400 });
     }
 
-    // Save to Supabase
+    // Save to Supabase - the helper will handle both formats
     const savedFactors = await supabaseHelpers.updateFactors(factors);
     
     return NextResponse.json({ 

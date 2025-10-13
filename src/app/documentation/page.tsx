@@ -19,7 +19,20 @@ export default function DocumentationPage() {
     return null;
   }
 
-  const sections = [
+  type ContentItem = {
+    subtitle: string;
+    text: string;
+    steps?: string[];
+    items?: string[];
+  };
+
+  type Section = {
+    title: string;
+    icon: typeof BookOpen;
+    content: ContentItem[];
+  };
+
+  const sections: Section[] = [
     {
       title: 'Getting Started',
       icon: BookOpen,

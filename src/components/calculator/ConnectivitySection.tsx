@@ -1,28 +1,36 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useCalculatorStore } from '@/store/calculator';
-import { useAuthStore } from '@/store/auth';
+import { useState, useEffect, memo, useCallback } from 'react';
+import { useCalculatorSections, useUpdateSectionItem, useAddTemporaryItem } from '@/store/calculator';
+import { useAuthUser } from '@/store/auth';
 import { formatCurrency, getItemCost, generateId } from '@/lib/utils';
 import { Item } from '@/lib/types';
-import { ChevronLeft, ChevronRight, Plus, Minus } from 'lucide-react';
+import { Plus, Minus, Wifi, Sparkles, Radio, Zap } from 'lucide-react';
+import { Button, Card, CardHeader, CardTitle, CardDescription, CardContent, Input, Label, Badge, Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui';
+import { GradientText, FloatingInput, MagneticButton, GlassCard } from '@/components/ui/modern';
 
 interface ConnectivitySectionProps {
   onNext: () => void;
   onPrev: () => void;
 }
 
-export default function ConnectivitySection({ onNext, onPrev }: ConnectivitySectionProps) {
-  const { sections, updateSectionItem, addTemporaryItem } = useCalculatorStore();
-  const { user } = useAuthStore();
+const ConnectivitySection = memo(function ConnectivitySection({ onNext, onPrev }: ConnectivitySectionProps) {
+  const sections = useCalculatorSections();
+  const updateSectionItem = useUpdateSectionItem();
+  const addTemporaryItem = useAddTemporaryItem();
+  const user = useAuthUser();
   const [connectivityItems, setConnectivityItems] = useState<Item[]>([]);
   const [totalConnectivityCost, setTotalConnectivityCost] = useState(0);
-  const [newItem, setNewItem] = useState({ name: '', cost: 0 });
+  const [newItem, setNewItem] = useState({
+    name: '',
+    cost: 0,
+    showOnProposal: true
+  });
   const [showAddForm, setShowAddForm] = useState(false);
 
   // Load connectivity items from store
   useEffect(() => {
-    const connectivitySection = sections.find(s => s.id === 'connectivity');
+    const connectivitySection = sections.find((s: any) => s.id === 'connectivity');
     if (connectivitySection) {
       setConnectivityItems(connectivitySection.items);
     }
@@ -38,202 +46,237 @@ export default function ConnectivitySection({ onNext, onPrev }: ConnectivitySect
   }, [connectivityItems, user?.role]);
 
   // Handle quantity change
-  const handleQuantityChange = (itemId: string, quantity: number) => {
+  const handleQuantityChange = useCallback((itemId: string, quantity: number) => {
     updateSectionItem('connectivity', itemId, { quantity: Math.max(0, quantity) });
-  };
+  }, [updateSectionItem]);
 
   // Handle adding a new temporary item
-  const handleAddTemporaryItem = () => {
+  const handleAddTemporaryItem = useCallback(() => {
     if (!newItem.name.trim()) {
       alert('Please enter an item name');
       return;
     }
-    
+
     if (newItem.cost <= 0) {
       alert('Cost must be greater than 0');
       return;
     }
-    
+
     // Create a new temporary item
     const tempItem: Item = {
       id: generateId(),
       name: newItem.name,
       cost: newItem.cost,
       quantity: 1,
-      locked: false
+      locked: false,
+      showOnProposal: newItem.showOnProposal,
+      isTemporary: true
     };
-    
+
     // Add the item to the connectivity section
     addTemporaryItem('connectivity', tempItem);
-    
-    // Reset the form
-    setNewItem({ name: '', cost: 0 });
-    setShowAddForm(false);
-  };
 
-  // Handle save and navigate to next section
-  const handleSave = () => {
-    onNext();
-  };
+    // Reset the form
+    setNewItem({ name: '', cost: 0, showOnProposal: true });
+    setShowAddForm(false);
+  }, [addTemporaryItem, newItem]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in-up">
+      {/* Header with Icon */}
       <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold gradient-text mb-2">
-          Connectivity Selection
+        <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-2xl mb-4 shadow-lg animate-float">
+          <Wifi className="w-8 h-8 text-white" />
+        </div>
+        <h2 className="text-3xl font-bold mb-2">
+          <GradientText animated gradient="blue-purple">
+            Connectivity Selection
+          </GradientText>
         </h2>
-        <p className="text-gray-600">
-          Select connectivity services and quantities for this deal
+        <p className="text-gray-600 flex items-center justify-center space-x-2">
+          <Sparkles className="w-4 h-4 text-cyan-500" />
+          <span>Select connectivity services and quantities for this deal</span>
+          <Sparkles className="w-4 h-4 text-cyan-500" />
         </p>
       </div>
 
       {/* Connectivity Items Table */}
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Service
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Monthly Cost
-              </th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Quantity
-              </th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Total
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {connectivityItems.map((item) => {
-              const cost = getItemCost(item, user?.role || 'user');
-              const total = cost * item.quantity;
-              
-              return (
-                <tr key={item.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="text-sm font-medium text-gray-900">{item.name}</span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
-                    {formatCurrency(cost)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    <div className="flex items-center justify-center space-x-2">
-                      <button
-                        onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
-                        className="p-1 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
-                        disabled={item.quantity <= 0}
-                      >
-                        <Minus className="w-3 h-3" />
-                      </button>
-                      <span className="w-12 text-center font-medium">{item.quantity}</span>
-                      <button
-                        onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
-                        className="p-1 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
-                      >
-                        <Plus className="w-3 h-3" />
-                      </button>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right font-medium">
-                    {formatCurrency(total)}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+      <GlassCard className="overflow-hidden" glow>
+        <div className="p-6">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-b border-white/20">
+                  <TableHead className="w-2/5 text-gray-700 font-bold">Service</TableHead>
+                  <TableHead className="w-1/5 text-right text-gray-700 font-bold">Monthly Cost</TableHead>
+                  <TableHead className="w-1/5 text-center text-gray-700 font-bold">Quantity</TableHead>
+                  <TableHead className="w-1/5 text-right text-gray-700 font-bold">Total</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {connectivityItems.map((item, index) => {
+                  const cost = getItemCost(item, user?.role || 'user');
+                  const total = cost * item.quantity;
+
+                  return (
+                    <TableRow 
+                      key={item.id}
+                      className="border-b border-white/10 hover:bg-white/40 transition-all duration-300 group"
+                      style={{ animationDelay: `${index * 0.05}s` }}
+                    >
+                      <TableCell>
+                        <div className="flex items-center space-x-2">
+                          <div className="w-2 h-2 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full group-hover:scale-150 transition-transform duration-300"></div>
+                          <span className="font-semibold text-gray-800">{item.name}</span>
+                          <div className="flex space-x-1">
+                            {item.isTemporary && (
+                              <Badge variant="purple" className="text-xs">Temporary</Badge>
+                            )}
+                            {item.isTemporary && !item.showOnProposal && (
+                              <Badge variant="warning" className="text-xs">Hidden</Badge>
+                            )}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right font-medium text-gray-700">
+                        {formatCurrency(cost)}/mo
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center justify-center space-x-2">
+                          <button
+                            onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
+                            disabled={item.quantity <= 0}
+                            className="p-2 h-8 w-8 rounded-lg bg-white/60 hover:bg-white/80 border border-white/40 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 hover:scale-110 active:scale-95 flex items-center justify-center group"
+                          >
+                            <Minus className="w-3 h-3 text-red-600 group-hover:scale-125 transition-transform" />
+                          </button>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={item.quantity}
+                            onChange={(e) => handleQuantityChange(item.id, parseInt(e.target.value) || 0)}
+                            className="w-16 text-center font-bold bg-white/60 border-white/40"
+                            inputSize="sm"
+                          />
+                          <button
+                            onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
+                            className="p-2 h-8 w-8 rounded-lg bg-white/60 hover:bg-white/80 border border-white/40 transition-all duration-200 hover:scale-110 active:scale-95 flex items-center justify-center group"
+                          >
+                            <Plus className="w-3 h-3 text-green-600 group-hover:scale-125 transition-transform" />
+                          </button>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right font-bold text-lg bg-gradient-to-r from-cyan-600 to-blue-600 bg-clip-text text-transparent">
+                        {formatCurrency(total)}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+      </GlassCard>
 
       {/* Total Connectivity Cost */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <div className="flex justify-between items-center">
-          <span className="text-lg font-semibold text-blue-900">
-            Total Monthly Connectivity Cost:
-          </span>
-          <span className="text-2xl font-bold text-blue-900">
-            {formatCurrency(totalConnectivityCost)}
-          </span>
+      <GlassCard className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/10 via-blue-500/10 to-indigo-500/10"></div>
+        <div className="relative p-6 flex justify-between items-center">
+          <div className="flex items-center space-x-3">
+            <div className="p-3 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl shadow-lg">
+              <Radio className="w-6 h-6 text-white" />
+            </div>
+            <span className="text-xl font-bold text-gray-800">
+              Total Monthly Connectivity Cost:
+            </span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Zap className="w-6 h-6 text-yellow-500 animate-pulse" />
+            <span className="text-3xl font-extrabold bg-gradient-to-r from-cyan-600 via-blue-600 to-indigo-600 bg-clip-text text-transparent">
+              {formatCurrency(totalConnectivityCost)}
+            </span>
+            <span className="text-sm text-gray-500 font-medium">/month</span>
+          </div>
         </div>
-      </div>
+      </GlassCard>
 
-      {/* Add Temporary Item Form */}
-      <div className="border border-gray-200 rounded-lg p-4">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">
-            Add Temporary Connectivity Service
-          </h3>
-          <button
-            onClick={() => setShowAddForm(!showAddForm)}
-            className="btn btn-outline"
-          >
-            {showAddForm ? 'Cancel' : 'Add Service'}
-          </button>
-        </div>
-        
-        {showAddForm && (
-          <div className="space-y-4">
-            <p className="text-sm text-gray-600">
-              Add a custom connectivity service for this calculation only. This service will not be saved for future calculations.
-            </p>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="label">Service Name</label>
-                <input
+      {/* Add Temporary Service Form */}
+      <GlassCard className="overflow-hidden">
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center space-x-3">
+              <div className="p-2 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg">
+                <Plus className="w-5 h-5 text-white" />
+              </div>
+              <h3 className="text-xl font-bold">
+                <GradientText gradient="blue-purple">
+                  Add Custom Connectivity Service
+                </GradientText>
+              </h3>
+            </div>
+            <MagneticButton
+              variant={showAddForm ? 'outline' : 'primary'}
+              size="md"
+              onClick={() => setShowAddForm(!showAddForm)}
+              glow={!showAddForm}
+            >
+              {showAddForm ? 'Cancel' : 'Add Service'}
+            </MagneticButton>
+          </div>
+
+          {showAddForm && (
+            <div className="space-y-6 animate-fade-in-up">
+              <div className="p-4 bg-cyan-50/50 backdrop-blur-sm rounded-xl border border-cyan-200/50">
+                <p className="text-sm text-gray-700 flex items-center space-x-2">
+                  <Sparkles className="w-4 h-4 text-cyan-500" />
+                  <span>Add a custom connectivity service for this calculation only. This service will not be saved for future calculations.</span>
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <FloatingInput
+                  label="Service Name"
                   type="text"
-                  className="input"
                   placeholder="Enter service name"
                   value={newItem.name}
                   onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
                 />
-              </div>
-              
-              <div>
-                <label className="label">Monthly Cost (R)</label>
-                <input
+
+                <FloatingInput
+                  label="Monthly Cost (R)"
                   type="number"
-                  className="input"
                   placeholder="Enter monthly cost"
                   value={newItem.cost || ''}
                   onChange={(e) => setNewItem({ ...newItem, cost: parseFloat(e.target.value) || 0 })}
-                  min="0"
-                  step="0.01"
                 />
               </div>
-              
-              <div className="flex items-end">
-                <button
-                  className="btn btn-success w-full"
-                  onClick={handleAddTemporaryItem}
-                >
-                  Add Service
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
 
-      {/* Navigation */}
-      <div className="flex justify-between">
-        <button 
-          onClick={onPrev}
-          className="btn btn-outline flex items-center space-x-2"
-        >
-          <ChevronLeft className="w-4 h-4" />
-          <span>Back: Hardware</span>
-        </button>
-        <button 
-          onClick={handleSave}
-          className="btn btn-primary flex items-center space-x-2"
-        >
-          <span>Next: Licensing</span>
-          <ChevronRight className="w-4 h-4" />
-        </button>
-      </div>
+              <label className="flex items-center space-x-3 p-4 bg-white/60 backdrop-blur-sm rounded-xl border border-white/40 cursor-pointer hover:bg-white/80 transition-all duration-200 group">
+                <input
+                  type="checkbox"
+                  checked={newItem.showOnProposal}
+                  onChange={(e) => setNewItem({ ...newItem, showOnProposal: e.target.checked })}
+                  className="w-5 h-5 text-cyan-600 rounded focus:ring-cyan-500 focus:ring-2"
+                />
+                <span className="text-sm font-medium text-gray-700 group-hover:text-cyan-600 transition-colors">Show on Proposal</span>
+              </label>
+
+              <MagneticButton
+                variant="primary"
+                size="lg"
+                onClick={handleAddTemporaryItem}
+                glow
+                className="w-full"
+              >
+                <Plus className="w-5 h-5" />
+                <span>Add Connectivity Service</span>
+              </MagneticButton>
+            </div>
+          )}
+        </div>
+      </GlassCard>
     </div>
   );
-} 
+});
+
+export default ConnectivitySection; 

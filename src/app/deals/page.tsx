@@ -20,7 +20,11 @@ interface Deal {
   sections: Record<string, unknown>[];
   factors: Record<string, unknown>;
   scales: Record<string, unknown>;
-  totals: Record<string, unknown>;
+  totals: {
+    totalPayout?: number;
+    extensionCount?: number;
+    [key: string]: unknown;
+  };
   createdAt: string;
   updatedAt: string;
 }
@@ -35,7 +39,6 @@ export default function DealsPage() {
     try {
       // Load deals from localStorage with better error handling
       const dealsStorage = localStorage.getItem('deals-storage');
-      console.log('Raw deals storage:', dealsStorage);
       
       let allDeals = [];
       if (dealsStorage) {
@@ -47,8 +50,6 @@ export default function DealsPage() {
         }
       }
       
-      console.log('All deals loaded:', allDeals);
-      
       // Filter deals based on user role
       let userDeals: Deal[] = [];
       if (user?.role === 'admin') {
@@ -59,7 +60,6 @@ export default function DealsPage() {
         userDeals = allDeals.filter((deal: Deal) => deal.userId === user?.id);
       }
       
-      console.log('Filtered deals for user:', userDeals);
       setDeals(userDeals);
     } catch (error) {
       console.error('Error loading deals:', error);
