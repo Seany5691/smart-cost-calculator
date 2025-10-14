@@ -164,65 +164,70 @@ export default function AdminDealsPage() {
   };
 
   // Calculate comprehensive cost analysis for a deal
+  // KEY PRINCIPLE: Use saved totals for customer pricing (what they were quoted)
+  // Only calculate cost pricing fresh for GP analysis
   const calculateCostAnalysis = (deal: Deal) => {
     const sections = deal.sections || [];
-    const totals = deal.totals as any || {};
+    const savedTotals = deal.totals as any || {}; // ✅ USE SAVED TOTALS
     const scales = deal.scales as any || {};
 
-    // Hardware costs (one-time)
+    // ===== CUSTOMER PRICING (FROM SAVED TOTALS) =====
+    // These are what the customer was actually quoted - DO NOT RECALCULATE
+    const customerHardwareTotal = Number(savedTotals.hardwareTotal) || 0;
+    const customerInstallationCost = Number(savedTotals.hardwareInstallTotal) || 0;
+    const customerGrossProfit = Number(savedTotals.totalGrossProfit) || 0;
+    const customerFinanceFee = Number(savedTotals.financeFee) || 0;
+    const customerSettlement = Number(savedTotals.settlementAmount) || 0;
+    const customerTotalPayout = Number(savedTotals.totalPayout) || 0;
+    const customerHardwareRental = Number(savedTotals.hardwareRental) || 0;
+    const customerConnectivityCost = Number(savedTotals.connectivityCost) || 0;
+    const customerLicensingCost = Number(savedTotals.licensingCost) || 0;
+    const customerFactorUsed = Number(savedTotals.factorUsed) || 0;
+    const extensionCount = Number(savedTotals.extensionCount) || 0;
+
+    // ===== COST PRICING (CALCULATE FROM SECTIONS) =====
+    // Calculate actual costs using admin cost pricing
     let hardwareCostPrice = 0;
-    let hardwareUserManagerPrice = 0;
     let hardwareItems: any[] = [];
-
-    // Monthly recurring costs
     let connectivityCostPrice = 0;
-    let connectivityUserManagerPrice = 0;
     let connectivityItems: any[] = [];
-
     let licensingCostPrice = 0;
-    let licensingUserManagerPrice = 0;
     let licensingItems: any[] = [];
 
     sections.forEach((section: any) => {
       if (section?.items && Array.isArray(section.items)) {
         section.items.forEach((item: any) => {
           if (item && (item.quantity || 0) > 0) {
-            const itemCost = Number(item.cost) || 0; // This is the admin cost price
+            const itemCost = Number(item.cost) || 0; // Admin cost price
             const itemQuantity = Number(item.quantity) || 0;
+            const costPrice = itemCost * itemQuantity;
 
-            // For user/manager pricing, we need to use the price they see, not the cost price
+            // Get user/manager price for this item
             let itemUserManagerPrice = itemCost; // Default fallback
-
-            // Check if this is a manager or user and get their respective pricing
-            if (deal.userRole === 'manager') {
+            if (deal.userRole === 'manager' || deal.userRole === 'admin') {
               itemUserManagerPrice = Number(item.managerCost) || Number(item.cost) || 0;
             } else {
               itemUserManagerPrice = Number(item.userCost) || Number(item.cost) || 0;
             }
-
-            const costPrice = itemCost * itemQuantity;
             const userManagerPrice = itemUserManagerPrice * itemQuantity;
 
             const itemBreakdown = {
               name: item.name || 'Unknown Item',
               quantity: itemQuantity,
-              costPrice: itemCost, // Admin cost price
-              userManagerPrice: itemUserManagerPrice, // What user/manager pays
+              costPrice: itemCost,
+              userManagerPrice: itemUserManagerPrice,
               totalCostPrice: costPrice,
               totalUserManagerPrice: userManagerPrice
             };
 
             if (section.id === 'hardware') {
               hardwareCostPrice += costPrice;
-              hardwareUserManagerPrice += userManagerPrice;
               hardwareItems.push(itemBreakdown);
             } else if (section.id === 'connectivity') {
               connectivityCostPrice += costPrice;
-              connectivityUserManagerPrice += userManagerPrice;
               connectivityItems.push(itemBreakdown);
             } else if (section.id === 'licensing') {
               licensingCostPrice += costPrice;
-              licensingUserManagerPrice += userManagerPrice;
               licensingItems.push(itemBreakdown);
             }
           }
@@ -230,370 +235,302 @@ export default function AdminDealsPage() {
       }
     });
 
-    // ===== RECURRING SERVICES ANALYSIS (SEPARATE FROM HARDWARE DEAL) =====
-    const monthlyConnectivityProfit = connectivityUserManagerPrice - connectivityCostPrice;
-    const monthlyLicensingProfit = licensingUserManagerPrice - licensingCostPrice;
-    const totalMonthlyRecurringProfit = monthlyConnectivityProfit + monthlyLicensingProfit;
-
-    // ===== HARDWARE DEAL ANALYSIS (PAYOUT BASED) =====
-    const factors = deal.factors as any || {};
-
-    // Rep's figures (what they calculated)
-    const repFactorUsed = Number(totals.factorUsed) || 0;
-    const repPayout = Number(totals.totalPayout) || 0;
-    const repHardwareRental = Number(totals.hardwareRental) || 0;
-    const repFinanceAmount = Number(totals.financeAmount) || 0;
-    const repInstallationCost = Number(totals.hardwareInstallTotal) || 0;
-    const repGrossProfit = Number(totals.totalGrossProfit) || 0;
-    const repFinanceFee = Number(totals.financeFee) || 0;
-
-    // Get admin cost factor (for true cost analysis)
-    const adminCostFactor = factors.cost ?
-      getFactorForDeal(factors, deal.term, deal.escalation, repFinanceAmount, 'admin') : repFactorUsed;
-
-    // Get user/manager factor (what they actually get)
-    const adminUserManagerFactor = getFactorForDeal(factors, deal.term, deal.escalation, repFinanceAmount, deal.userRole as 'admin' | 'manager' | 'user') || repFactorUsed;
-
-    // Calculate actual payout using admin cost factor
-    const actualPayout = adminCostFactor > 0 ? repHardwareRental / adminCostFactor : 0;
-
-    // Calculate user/manager payout (what they think they're getting)
-    const userManagerPayout = adminUserManagerFactor > 0 ? repHardwareRental / adminUserManagerFactor : 0;
-
-    // Actual costs (admin cost prices)
-    const actualStockCost = hardwareCostPrice;
-    const extensionCount = Number(totals.extensionCount) || 0;
-    const dealSettlement = Number(deal.settlement) || 0;
-
-    // Calculate actual installation cost using proper sliding scale logic
-    let actualInstallationSlidingScale = 0;
-    if (scales?.installation?.cost) {
-      const installationData = scales.installation.cost;
-
-      if (typeof installationData === 'object' && installationData !== null) {
-        // Use explicit range checking for installation sliding scale
-        if (extensionCount >= 0 && extensionCount <= 4 && installationData['0-4']) {
-          actualInstallationSlidingScale = typeof installationData['0-4'] === 'string' ? parseFloat(installationData['0-4']) : installationData['0-4'];
-        } else if (extensionCount >= 5 && extensionCount <= 8 && installationData['5-8']) {
-          actualInstallationSlidingScale = typeof installationData['5-8'] === 'string' ? parseFloat(installationData['5-8']) : installationData['5-8'];
-        } else if (extensionCount >= 9 && extensionCount <= 16 && installationData['9-16']) {
-          actualInstallationSlidingScale = typeof installationData['9-16'] === 'string' ? parseFloat(installationData['9-16']) : installationData['9-16'];
-        } else if (extensionCount >= 17 && extensionCount <= 32 && installationData['17-32']) {
-          actualInstallationSlidingScale = typeof installationData['17-32'] === 'string' ? parseFloat(installationData['17-32']) : installationData['17-32'];
-        } else if (extensionCount >= 33 && installationData['33+']) {
-          actualInstallationSlidingScale = typeof installationData['33+'] === 'string' ? parseFloat(installationData['33+']) : installationData['33+'];
-        }
-      } else if (typeof installationData === 'number') {
-        actualInstallationSlidingScale = installationData;
-      }
-    }
-
-    // Calculate actual extension and fuel costs
-    const actualExtensionCost = extensionCount * (Number(scales?.additional_costs?.cost_per_point) || 0);
-    const actualFuelCost = Number(deal.distanceToInstall) * (Number(scales?.additional_costs?.cost_per_kilometer) || 0);
-    const actualInstallationCost = actualInstallationSlidingScale + actualExtensionCost + actualFuelCost;
-
-    // Calculate actual finance fee using iterative logic
-    let actualFinanceFee = 0;
-    if (scales?.finance_fee?.cost) {
-      // Calculate base total payout for admin cost calculation
-      let baseTotalPayout = actualStockCost + actualInstallationCost + repGrossProfit + dealSettlement;
-
-      // Iteratively calculate finance fee until it stabilizes
-      let previousFinanceFee = -1;
-      let iterations = 0;
-      const maxIterations = 10;
-
-      while (actualFinanceFee !== previousFinanceFee && iterations < maxIterations) {
-        previousFinanceFee = actualFinanceFee;
-        const totalPayoutForFeeCalculation = baseTotalPayout + actualFinanceFee;
-
-        const financeFeeBands = scales.finance_fee.cost;
-
-        if (typeof financeFeeBands === 'object' && financeFeeBands !== null) {
-          // Reset finance fee before checking
-          actualFinanceFee = 0;
-
-          // Use explicit range checking for finance fee bands
-          if (totalPayoutForFeeCalculation >= 0 && totalPayoutForFeeCalculation <= 20000) {
-            if (financeFeeBands['0-20000']) {
-              actualFinanceFee = typeof financeFeeBands['0-20000'] === 'string' ? parseFloat(financeFeeBands['0-20000']) : financeFeeBands['0-20000'];
-            }
-          } else if (totalPayoutForFeeCalculation >= 20001 && totalPayoutForFeeCalculation <= 50000) {
-            if (financeFeeBands['20001-50000']) {
-              actualFinanceFee = typeof financeFeeBands['20001-50000'] === 'string' ? parseFloat(financeFeeBands['20001-50000']) : financeFeeBands['20001-50000'];
-            }
-          } else if (totalPayoutForFeeCalculation >= 50001 && totalPayoutForFeeCalculation <= 100000) {
-            if (financeFeeBands['50001-100000']) {
-              actualFinanceFee = typeof financeFeeBands['50001-100000'] === 'string' ? parseFloat(financeFeeBands['50001-100000']) : financeFeeBands['50001-100000'];
-            }
-          } else if (totalPayoutForFeeCalculation >= 100001) {
-            if (financeFeeBands['100001+']) {
-              actualFinanceFee = typeof financeFeeBands['100001+'] === 'string' ? parseFloat(financeFeeBands['100001+']) : financeFeeBands['100001+'];
-            }
-          }
-        } else if (typeof financeFeeBands === 'number') {
-          actualFinanceFee = financeFeeBands;
-        }
-
-        iterations++;
-      }
-    }
-
-    // User/Manager costs (what they think the costs are)
-    const userManagerStockCost = hardwareUserManagerPrice;
-
-    // Calculate user/manager installation cost using proper sliding scale logic
-    let userManagerInstallationSlidingScale = 0;
+    // ===== REP'S INSTALLATION BREAKDOWN (User/Manager Pricing) =====
+    // Calculate what the rep quoted using user/manager pricing
+    let repInstallationSlidingScale = 0;
+    const userRole = deal.userRole || 'user';
+    
     if (scales?.installation) {
-      // Get the role-based installation data
       let installationData;
-      if (deal.userRole === 'manager' || deal.userRole === 'admin') {
+      if (userRole === 'manager' || userRole === 'admin') {
         installationData = scales.installation.managerCost || scales.installation.cost;
       } else {
         installationData = scales.installation.userCost || scales.installation.cost;
       }
 
       if (typeof installationData === 'object' && installationData !== null) {
-        // Use explicit range checking for installation sliding scale
         if (extensionCount >= 0 && extensionCount <= 4 && installationData['0-4']) {
-          userManagerInstallationSlidingScale = typeof installationData['0-4'] === 'string' ? parseFloat(installationData['0-4']) : installationData['0-4'];
+          repInstallationSlidingScale = typeof installationData['0-4'] === 'string' ? parseFloat(installationData['0-4']) : installationData['0-4'];
         } else if (extensionCount >= 5 && extensionCount <= 8 && installationData['5-8']) {
-          userManagerInstallationSlidingScale = typeof installationData['5-8'] === 'string' ? parseFloat(installationData['5-8']) : installationData['5-8'];
+          repInstallationSlidingScale = typeof installationData['5-8'] === 'string' ? parseFloat(installationData['5-8']) : installationData['5-8'];
         } else if (extensionCount >= 9 && extensionCount <= 16 && installationData['9-16']) {
-          userManagerInstallationSlidingScale = typeof installationData['9-16'] === 'string' ? parseFloat(installationData['9-16']) : installationData['9-16'];
+          repInstallationSlidingScale = typeof installationData['9-16'] === 'string' ? parseFloat(installationData['9-16']) : installationData['9-16'];
         } else if (extensionCount >= 17 && extensionCount <= 32 && installationData['17-32']) {
-          userManagerInstallationSlidingScale = typeof installationData['17-32'] === 'string' ? parseFloat(installationData['17-32']) : installationData['17-32'];
+          repInstallationSlidingScale = typeof installationData['17-32'] === 'string' ? parseFloat(installationData['17-32']) : installationData['17-32'];
         } else if (extensionCount >= 33 && installationData['33+']) {
-          userManagerInstallationSlidingScale = typeof installationData['33+'] === 'string' ? parseFloat(installationData['33+']) : installationData['33+'];
+          repInstallationSlidingScale = typeof installationData['33+'] === 'string' ? parseFloat(installationData['33+']) : installationData['33+'];
         }
       } else if (typeof installationData === 'number') {
-        userManagerInstallationSlidingScale = installationData;
+        repInstallationSlidingScale = installationData;
       }
     }
 
-    // Calculate user/manager extension and fuel costs
-    let userManagerExtensionCost = 0;
-    let userManagerFuelCost = 0;
-
+    // Rep's extension and fuel costs (user/manager pricing)
+    let repExtensionCost = 0;
+    let repFuelCost = 0;
     if (scales?.additional_costs) {
-      if (deal.userRole === 'manager' || deal.userRole === 'admin') {
-        userManagerExtensionCost = extensionCount * (Number(scales.additional_costs.manager_cost_per_point) || Number(scales.additional_costs.cost_per_point) || 0);
-        userManagerFuelCost = Number(deal.distanceToInstall) * (Number(scales.additional_costs.manager_cost_per_kilometer) || Number(scales.additional_costs.cost_per_kilometer) || 0);
+      if (userRole === 'manager' || userRole === 'admin') {
+        repExtensionCost = extensionCount * (Number(scales.additional_costs.manager_cost_per_point) || Number(scales.additional_costs.cost_per_point) || 0);
+        repFuelCost = Number(deal.distanceToInstall) * (Number(scales.additional_costs.manager_cost_per_kilometer) || Number(scales.additional_costs.cost_per_kilometer) || 0);
       } else {
-        userManagerExtensionCost = extensionCount * (Number(scales.additional_costs.user_cost_per_point) || Number(scales.additional_costs.cost_per_point) || 0);
-        userManagerFuelCost = Number(deal.distanceToInstall) * (Number(scales.additional_costs.user_cost_per_kilometer) || Number(scales.additional_costs.cost_per_kilometer) || 0);
+        repExtensionCost = extensionCount * (Number(scales.additional_costs.user_cost_per_point) || Number(scales.additional_costs.cost_per_point) || 0);
+        repFuelCost = Number(deal.distanceToInstall) * (Number(scales.additional_costs.user_cost_per_kilometer) || Number(scales.additional_costs.cost_per_kilometer) || 0);
+      }
+    }
+    const repInstallationTotal = repInstallationSlidingScale + repExtensionCost + repFuelCost;
+
+    // ===== ACTUAL INSTALLATION BREAKDOWN (Cost Pricing) =====
+    // Calculate actual costs using admin cost pricing
+    let costInstallationSlidingScale = 0;
+    if (scales?.installation?.cost) {
+      const installationData = scales.installation.cost;
+
+      if (typeof installationData === 'object' && installationData !== null) {
+        if (extensionCount >= 0 && extensionCount <= 4 && installationData['0-4']) {
+          costInstallationSlidingScale = typeof installationData['0-4'] === 'string' ? parseFloat(installationData['0-4']) : installationData['0-4'];
+        } else if (extensionCount >= 5 && extensionCount <= 8 && installationData['5-8']) {
+          costInstallationSlidingScale = typeof installationData['5-8'] === 'string' ? parseFloat(installationData['5-8']) : installationData['5-8'];
+        } else if (extensionCount >= 9 && extensionCount <= 16 && installationData['9-16']) {
+          costInstallationSlidingScale = typeof installationData['9-16'] === 'string' ? parseFloat(installationData['9-16']) : installationData['9-16'];
+        } else if (extensionCount >= 17 && extensionCount <= 32 && installationData['17-32']) {
+          costInstallationSlidingScale = typeof installationData['17-32'] === 'string' ? parseFloat(installationData['17-32']) : installationData['17-32'];
+        } else if (extensionCount >= 33 && installationData['33+']) {
+          costInstallationSlidingScale = typeof installationData['33+'] === 'string' ? parseFloat(installationData['33+']) : installationData['33+'];
+        }
+      } else if (typeof installationData === 'number') {
+        costInstallationSlidingScale = installationData;
       }
     }
 
-    const userManagerInstallationCost = userManagerInstallationSlidingScale + userManagerExtensionCost + userManagerFuelCost;
-    const userManagerFinanceFee = repFinanceFee; // They see the quoted finance fee
+    const costExtensionCost = extensionCount * (Number(scales?.additional_costs?.cost_per_point) || 0);
+    const costFuelCost = Number(deal.distanceToInstall) * (Number(scales?.additional_costs?.cost_per_kilometer) || 0);
+    const costInstallationTotal = costInstallationSlidingScale + costExtensionCost + costFuelCost;
 
-    // Calculate actual gross profit using admin cost factor for true payout calculation
-    const actualGrossProfit = actualPayout - actualStockCost - dealSettlement - actualInstallationCost - actualFinanceFee;
+    // ===== HARDWARE DEAL ANALYSIS =====
+    // Calculate GP for both Rep and Actual
+    // Rep GP = Payout - Rep Stock - Rep Installation - Settlement - Finance Fee
+    const repGP = customerTotalPayout - customerHardwareTotal - repInstallationTotal - customerSettlement - customerFinanceFee;
+    
+    // Actual GP = Payout - Actual Stock - Actual Installation - Settlement - Finance Fee
+    const actualGP = customerTotalPayout - hardwareCostPrice - costInstallationTotal - customerSettlement - customerFinanceFee;
+    
+    const hardwareDealAnalysis = {
+      customer: {
+        hardwareTotal: customerHardwareTotal,
+        installationCost: customerInstallationCost,
+        installationBreakdown: {
+          slidingScale: repInstallationSlidingScale,
+          extensionCost: repExtensionCost,
+          fuelCost: repFuelCost,
+          total: repInstallationTotal
+        },
+        grossProfit: customerGrossProfit,
+        financeFee: customerFinanceFee,
+        settlement: customerSettlement,
+        totalPayout: customerTotalPayout,
+        factorUsed: customerFactorUsed
+      },
+      cost: {
+        hardwareTotal: hardwareCostPrice,
+        installationCost: costInstallationTotal,
+        installationBreakdown: {
+          slidingScale: costInstallationSlidingScale,
+          extensionCost: costExtensionCost,
+          fuelCost: costFuelCost,
+          total: costInstallationTotal
+        },
+        totalCosts: hardwareCostPrice + costInstallationTotal
+      },
+      grossProfit: {
+        repGP: repGP,
+        actualGP: actualGP,
+        gpDifference: actualGP - repGP,
+        gpPercentage: customerTotalPayout > 0
+          ? (actualGP / customerTotalPayout) * 100
+          : 0
+      }
+    };
 
-    // Calculate user/manager gross profit (what they think they're getting)
-    const userManagerGrossProfit = userManagerPayout - userManagerStockCost - dealSettlement - userManagerInstallationCost - userManagerFinanceFee;
+    // ===== MONTHLY RECURRING ANALYSIS (SEPARATE FROM HARDWARE) =====
+    // Connectivity and Licensing ONLY - Hardware Rental is part of hardware deal
+    const monthlyRecurringAnalysis = {
+      customer: {
+        connectivity: customerConnectivityCost,
+        licensing: customerLicensingCost,
+        total: customerConnectivityCost + customerLicensingCost
+      },
+      cost: {
+        connectivity: connectivityCostPrice,
+        licensing: licensingCostPrice,
+        total: connectivityCostPrice + licensingCostPrice
+      },
+      grossProfit: {
+        connectivity: customerConnectivityCost - connectivityCostPrice,
+        licensing: customerLicensingCost - licensingCostPrice,
+        total: (customerConnectivityCost - connectivityCostPrice) + (customerLicensingCost - licensingCostPrice),
+        gpPercentage: (customerConnectivityCost + customerLicensingCost) > 0
+          ? (((customerConnectivityCost - connectivityCostPrice) + (customerLicensingCost - licensingCostPrice)) / (customerConnectivityCost + customerLicensingCost)) * 100
+          : 0
+      }
+    };
 
-    // ===== COMPREHENSIVE TERM ANALYSIS =====
+    // ===== TERM ANALYSIS (OPTIONAL - FOR FULL DEAL VIEW) =====
     const dealTerm = Number(deal.term) || 0;
-
-    // Recurring services over full term
+    const termConnectivityRevenue = customerConnectivityCost * dealTerm;
     const termConnectivityCost = connectivityCostPrice * dealTerm;
-    const termConnectivityRevenue = connectivityUserManagerPrice * dealTerm;
-    const termConnectivityProfit = termConnectivityRevenue - termConnectivityCost;
-
+    const termLicensingRevenue = customerLicensingCost * dealTerm;
     const termLicensingCost = licensingCostPrice * dealTerm;
-    const termLicensingRevenue = licensingUserManagerPrice * dealTerm;
-    const termLicensingProfit = termLicensingRevenue - termLicensingCost;
 
-    // Total recurring over term
-    const totalRecurringCost = termConnectivityCost + termLicensingCost;
-    const totalRecurringRevenue = termConnectivityRevenue + termLicensingRevenue;
-    const totalRecurringProfit = totalRecurringRevenue - totalRecurringCost;
-    const termRecurringProfit = totalMonthlyRecurringProfit * dealTerm;
 
-    // Complete deal totals (hardware deal + recurring over full term) - ADMIN PERSPECTIVE
-    const completeDealActualCost = actualStockCost + dealSettlement + actualInstallationCost + actualFinanceFee + totalRecurringCost;
-    const completeDealActualRevenue = actualPayout + totalRecurringRevenue;
-    const completeDealActualProfit = completeDealActualRevenue - completeDealActualCost;
 
-    // Complete deal totals (hardware deal + recurring over full term) - USER/MANAGER PERSPECTIVE
-    const completeDealUserManagerCost = userManagerStockCost + dealSettlement + userManagerInstallationCost + userManagerFinanceFee + totalRecurringCost;
-    const completeDealUserManagerRevenue = userManagerPayout + totalRecurringRevenue;
-    const completeDealUserManagerProfit = completeDealUserManagerRevenue - completeDealUserManagerCost;
-
-    // Legacy calculations for backward compatibility
-    const totalCostPrice = hardwareCostPrice + connectivityCostPrice + licensingCostPrice;
-    const totalUserManagerPrice = hardwareUserManagerPrice + connectivityUserManagerPrice + licensingUserManagerPrice;
-    const totalProfit = totalUserManagerPrice - totalCostPrice;
+    // ===== BACKWARD COMPATIBILITY LAYER =====
+    // Map new structure to old structure for existing JSX
+    const backwardCompatibleStructure = {
+      rep: {
+        factorUsed: customerFactorUsed,
+        payout: customerTotalPayout,
+        hardwareRental: customerHardwareRental,
+        stockCost: customerHardwareTotal,
+        installationCost: repInstallationTotal,
+        installationSlidingScale: repInstallationSlidingScale,
+        extensionCost: repExtensionCost,
+        fuelCost: repFuelCost,
+        financeFee: customerFinanceFee,
+        settlement: customerSettlement,
+        grossProfit: repGP
+      },
+      actual: {
+        factorUsed: customerFactorUsed,
+        payout: customerTotalPayout,
+        hardwareRental: customerHardwareRental,
+        stockCost: hardwareCostPrice,
+        installationCost: costInstallationTotal,
+        installationSlidingScale: costInstallationSlidingScale,
+        extensionCost: costExtensionCost,
+        fuelCost: costFuelCost,
+        financeFee: customerFinanceFee,
+        settlement: customerSettlement,
+        grossProfit: actualGP
+      },
+      userManager: {
+        factorUsed: customerFactorUsed,
+        payout: customerTotalPayout,
+        hardwareRental: customerHardwareRental,
+        stockCost: customerHardwareTotal,
+        installationCost: repInstallationTotal,
+        financeFee: customerFinanceFee,
+        settlement: customerSettlement,
+        grossProfit: repGP
+      },
+      differences: {
+        payoutDifference: 0,
+        stockCostDifference: customerHardwareTotal - hardwareCostPrice,
+        installCostDifference: repInstallationTotal - costInstallationTotal,
+        installSlidingScaleDiff: repInstallationSlidingScale - costInstallationSlidingScale,
+        extensionCostDiff: repExtensionCost - costExtensionCost,
+        fuelCostDiff: repFuelCost - costFuelCost,
+        grossProfitDifference: actualGP - repGP
+      }
+    };
 
     return {
-      // Hardware (One-time)
-      hardware: {
-        costPrice: hardwareCostPrice,
-        userManagerPrice: hardwareUserManagerPrice,
-        items: hardwareItems,
-        profit: hardwareUserManagerPrice - hardwareCostPrice
-      },
-
-      // Monthly Recurring
-      connectivity: {
-        costPrice: connectivityCostPrice,
-        userManagerPrice: connectivityUserManagerPrice,
-        items: connectivityItems,
-        monthlyProfit: monthlyConnectivityProfit
-      },
-
-      licensing: {
-        costPrice: licensingCostPrice,
-        userManagerPrice: licensingUserManagerPrice,
-        items: licensingItems,
-        monthlyProfit: monthlyLicensingProfit
-      },
-
-      // Hardware Deal Analysis (Payout-based)
-      hardwareDeal: {
-        // Rep's calculations
-        rep: {
-          factorUsed: repFactorUsed,
-          payout: repPayout,
-          hardwareRental: repHardwareRental,
-          stockCost: userManagerStockCost,
-          installationCost: repInstallationCost,
-          financeFee: repFinanceFee,
-          settlement: dealSettlement,
-          grossProfit: repGrossProfit
-        },
-        // Admin's actual calculations
-        actual: {
-          factorUsed: adminCostFactor,
-          payout: actualPayout,
-          hardwareRental: repHardwareRental,
-          stockCost: actualStockCost,
-          installationCost: actualInstallationCost,
-          financeFee: actualFinanceFee,
-          settlement: dealSettlement,
-          grossProfit: actualGrossProfit
-        },
-        // User/Manager perspective
-        userManager: {
-          factorUsed: adminUserManagerFactor,
-          payout: userManagerPayout,
-          hardwareRental: repHardwareRental,
-          stockCost: userManagerStockCost,
-          installationCost: userManagerInstallationCost,
-          financeFee: userManagerFinanceFee,
-          settlement: dealSettlement,
-          grossProfit: userManagerGrossProfit
-        },
-        // Differences
-        differences: {
-          payoutDifference: actualPayout - repPayout,
-          stockCostDifference: actualStockCost - userManagerStockCost,
-          installCostDifference: actualInstallationCost - repInstallationCost,
-          grossProfitDifference: actualGrossProfit - repGrossProfit
-        }
-      },
-
-      // Recurring Services Analysis
-      recurringServices: {
-        monthly: {
-          connectivityProfit: monthlyConnectivityProfit,
-          licensingProfit: monthlyLicensingProfit,
-          totalProfit: totalMonthlyRecurringProfit
-        },
-        annual: {
-          connectivityProfit: monthlyConnectivityProfit * 12,
-          licensingProfit: monthlyLicensingProfit * 12,
-          totalProfit: totalMonthlyRecurringProfit * 12
-        },
-        fullTerm: {
-          connectivityProfit: termConnectivityProfit,
-          licensingProfit: termLicensingProfit,
-          totalProfit: termRecurringProfit
-        },
-        dealTerm: dealTerm
-      },
-
-      // Comprehensive Term Analysis
-      termAnalysis: {
-        dealTerm: dealTerm,
-        // Recurring services over full term
-        connectivity: {
-          cost: termConnectivityCost,
-          revenue: termConnectivityRevenue,
-          profit: termConnectivityProfit
-        },
-        licensing: {
-          cost: termLicensingCost,
-          revenue: termLicensingRevenue,
-          profit: termLicensingProfit
-        },
-        totalRecurring: {
-          cost: totalRecurringCost,
-          revenue: totalRecurringRevenue,
-          profit: totalRecurringProfit
-        },
-        // Complete deal totals (hardware deal + recurring over full term)
-        completeDeal: {
-          // Admin perspective (TRUE COSTS AND PROFITS)
-          actual: {
-            cost: completeDealActualCost,
-            revenue: completeDealActualRevenue,
-            profit: completeDealActualProfit,
-            margin: completeDealActualRevenue > 0 ? ((completeDealActualProfit / completeDealActualRevenue) * 100) : 0
-          },
-          // User/Manager perspective (what they think)
-          userManager: {
-            cost: completeDealUserManagerCost,
-            revenue: completeDealUserManagerRevenue,
-            profit: completeDealUserManagerProfit,
-            margin: completeDealUserManagerRevenue > 0 ? ((completeDealUserManagerProfit / completeDealUserManagerRevenue) * 100) : 0
-          },
-          // Legacy (for backward compatibility)
-          cost: completeDealUserManagerCost,
-          revenue: completeDealUserManagerRevenue,
-          profit: completeDealUserManagerProfit,
-          margin: completeDealUserManagerRevenue > 0 ? ((completeDealUserManagerProfit / completeDealUserManagerRevenue) * 100) : 0
-        }
-      },
-
-      // Deal Info
       dealInfo: {
         customerName: deal.customerName || 'Unknown Customer',
         username: deal.username || 'Unknown User',
         userRole: deal.userRole || 'user',
-        term: Number(deal.term) || 0,
+        term: dealTerm,
         escalation: Number(deal.escalation) || 0,
-        settlement: Number(deal.settlement) || 0,
-        extensionCount: Number(totals.extensionCount) || 0
+        settlement: customerSettlement,
+        extensionCount: extensionCount
       },
 
-      // Additional calculated fields for modal
-      costPriceTotal: totalCostPrice,
-      userManagerPriceTotal: totalUserManagerPrice,
-      grossProfit: totalProfit,
-      grossProfitMargin: totalUserManagerPrice > 0 ? ((totalProfit / totalUserManagerPrice) * 100) : 0,
+      // New simplified structure
+      hardwareDeal: {
+        ...hardwareDealAnalysis,
+        // Backward compatibility
+        ...backwardCompatibleStructure
+      },
 
-      // Deal-specific calculations
-      dealGrossProfit: actualGrossProfit,
-      dealGrossProfitMargin: actualPayout > 0 ? ((actualGrossProfit / actualPayout) * 100) : 0,
+      // Monthly Recurring Analysis (separate from hardware)
+      monthlyRecurring: monthlyRecurringAnalysis,
+
+      // Backward compatibility for recurring services
+      recurringServices: {
+        monthly: {
+          connectivityProfit: monthlyRecurringAnalysis.grossProfit.connectivity,
+          licensingProfit: monthlyRecurringAnalysis.grossProfit.licensing,
+          totalProfit: monthlyRecurringAnalysis.grossProfit.total
+        },
+        annual: {
+          connectivityProfit: monthlyRecurringAnalysis.grossProfit.connectivity * 12,
+          licensingProfit: monthlyRecurringAnalysis.grossProfit.licensing * 12,
+          totalProfit: monthlyRecurringAnalysis.grossProfit.total * 12
+        },
+        fullTerm: {
+          connectivityProfit: (termConnectivityRevenue - termConnectivityCost),
+          licensingProfit: (termLicensingRevenue - termLicensingCost),
+          totalProfit: (termConnectivityRevenue - termConnectivityCost) + (termLicensingRevenue - termLicensingCost)
+        },
+        dealTerm: dealTerm
+      },
+
+      // Combined Summary
+      combined: {
+        totalDealValue: customerTotalPayout,
+        totalMonthlyValue: customerConnectivityCost + customerLicensingCost,
+        totalActualCosts: hardwareCostPrice + costInstallationTotal + connectivityCostPrice + licensingCostPrice,
+        totalActualGP: hardwareDealAnalysis.grossProfit.actualGP + monthlyRecurringAnalysis.grossProfit.total,
+        overallGPPercentage: (customerTotalPayout + (customerConnectivityCost + customerLicensingCost)) > 0
+          ? ((hardwareDealAnalysis.grossProfit.actualGP + monthlyRecurringAnalysis.grossProfit.total) / (customerTotalPayout + (customerConnectivityCost + customerLicensingCost))) * 100
+          : 0
+      },
+
+      // Term Analysis
+      termAnalysis: {
+        dealTerm: dealTerm,
+        connectivity: {
+          revenue: termConnectivityRevenue,
+          cost: termConnectivityCost,
+          profit: termConnectivityRevenue - termConnectivityCost
+        },
+        licensing: {
+          revenue: termLicensingRevenue,
+          cost: termLicensingCost,
+          profit: termLicensingRevenue - termLicensingCost
+        },
+        totalRecurring: {
+          revenue: termConnectivityRevenue + termLicensingRevenue,
+          cost: termConnectivityCost + termLicensingCost,
+          profit: (termConnectivityRevenue + termLicensingRevenue) - (termConnectivityCost + termLicensingCost)
+        },
+        completeDeal: {
+          actual: {
+            revenue: customerTotalPayout + (termConnectivityRevenue + termLicensingRevenue),
+            cost: (hardwareCostPrice + costInstallationTotal + customerSettlement) + (termConnectivityCost + termLicensingCost),
+            profit: (customerTotalPayout - hardwareCostPrice - costInstallationTotal - customerSettlement) + ((termConnectivityRevenue + termLicensingRevenue) - (termConnectivityCost + termLicensingCost)),
+            margin: (customerTotalPayout + (termConnectivityRevenue + termLicensingRevenue)) > 0
+              ? (((customerTotalPayout - hardwareCostPrice - costInstallationTotal - customerSettlement) + ((termConnectivityRevenue + termLicensingRevenue) - (termConnectivityCost + termLicensingCost))) / (customerTotalPayout + (termConnectivityRevenue + termLicensingRevenue))) * 100
+              : 0
+          }
+        }
+      },
+
+      // Item Breakdowns
       breakdown: {
         hardware: {
           items: hardwareItems,
           costPrice: hardwareCostPrice,
-          userManagerPrice: hardwareUserManagerPrice
+          userManagerPrice: customerHardwareTotal
         },
         connectivity: {
           items: connectivityItems,
           costPrice: connectivityCostPrice,
-          userManagerPrice: connectivityUserManagerPrice
+          userManagerPrice: customerConnectivityCost
         },
         licensing: {
           items: licensingItems,
           costPrice: licensingCostPrice,
-          userManagerPrice: licensingUserManagerPrice
+          userManagerPrice: customerLicensingCost
         }
       }
     };
@@ -717,15 +654,15 @@ export default function AdminDealsPage() {
                 <div style="margin: 10px 0;">
                   <div style="display: flex; justify-content: space-between; margin: 5px 0;">
                     <span>Cost Price:</span>
-                    <span class="font-bold">${formatCurrency(analysis.hardware.costPrice)}</span>
+                    <span class="font-bold">${formatCurrency(analysis.breakdown.hardware.costPrice)}</span>
                   </div>
                   <div style="display: flex; justify-content: space-between; margin: 5px 0;">
                     <span>${analysis.dealInfo.userRole === 'manager' || analysis.dealInfo.userRole === 'admin' ? 'Manager' : 'User'} Price:</span>
-                    <span class="font-bold">${formatCurrency(analysis.hardware.userManagerPrice)}</span>
+                    <span class="font-bold">${formatCurrency(analysis.breakdown.hardware.userManagerPrice)}</span>
                   </div>
                   <div style="display: flex; justify-content: space-between; margin: 10px 0; padding-top: 8px; border-top: 1px solid #ddd;">
                     <span class="font-bold">Hardware Profit:</span>
-                    <span class="${analysis.hardware.profit >= 0 ? 'text-green' : 'text-red'}">${formatCurrency(analysis.hardware.profit)}</span>
+                    <span class="${(analysis.breakdown.hardware.userManagerPrice - analysis.breakdown.hardware.costPrice) >= 0 ? 'text-green' : 'text-red'}">${formatCurrency(analysis.breakdown.hardware.userManagerPrice - analysis.breakdown.hardware.costPrice)}</span>
                   </div>
                 </div>
               </div>
@@ -961,10 +898,10 @@ export default function AdminDealsPage() {
           <div class="section">
             <h2>📋 Item Cost Breakdown</h2>
             ${['hardware', 'connectivity', 'licensing'].map((sectionKey) => {
-              const section = analysis.breakdown[sectionKey as keyof typeof analysis.breakdown];
-              if (!section.items.length) return '';
-              
-              return `
+        const section = analysis.breakdown[sectionKey as keyof typeof analysis.breakdown];
+        if (!section || !section.items || !section.items.length) return '';
+
+        return `
                 <div style="margin-bottom: 25px;">
                   <h3 style="background-color: #f5f5f5; padding: 10px; border-radius: 5px; text-transform: capitalize;">${sectionKey} Items</h3>
                   <table class="table">
@@ -1005,7 +942,7 @@ export default function AdminDealsPage() {
                   </table>
                 </div>
               `;
-            }).join('')}
+      }).join('')}
           </div>
 
           <div style="text-align: center; font-style: italic; color: #666; margin-top: 30px;">
@@ -1033,7 +970,7 @@ export default function AdminDealsPage() {
         printWindow.document.write(htmlContent);
         printWindow.document.close();
         printWindow.focus();
-        
+
         // Wait a moment for content to load, then trigger print dialog
         setTimeout(() => {
           printWindow.print();
@@ -1213,8 +1150,8 @@ export default function AdminDealsPage() {
                       </div>
                       <div className="flex items-center gap-2">
                         <span className={`px-2 py-1 text-xs font-medium rounded-full ${deal.userRole === 'admin' ? 'bg-purple-100 text-purple-800' :
-                            deal.userRole === 'manager' ? 'bg-blue-100 text-blue-800' :
-                              'bg-green-100 text-green-800'
+                          deal.userRole === 'manager' ? 'bg-blue-100 text-blue-800' :
+                            'bg-green-100 text-green-800'
                           }`}>
                           {deal.userRole}
                         </span>
@@ -1375,9 +1312,9 @@ export default function AdminDealsPage() {
                         <h3 className="text-xl font-bold text-blue-600 mb-2">📊 Complete Deal Analysis</h3>
                         <h4 className="text-lg font-semibold text-gray-900">{analysis.dealInfo.customerName}</h4>
                         <p className="text-sm text-gray-600 mt-2">
-                          <strong>Rep:</strong> {analysis.dealInfo.username} ({analysis.dealInfo.userRole}) | 
-                          <strong> Term:</strong> {analysis.dealInfo.term} months | 
-                          <strong> Escalation:</strong> {analysis.dealInfo.escalation}% | 
+                          <strong>Rep:</strong> {analysis.dealInfo.username} ({analysis.dealInfo.userRole}) |
+                          <strong> Term:</strong> {analysis.dealInfo.term} months |
+                          <strong> Escalation:</strong> {analysis.dealInfo.escalation}% |
                           <strong> Extensions:</strong> {analysis.dealInfo.extensionCount}
                         </p>
                         <p className="text-sm text-gray-600">
@@ -1437,7 +1374,7 @@ export default function AdminDealsPage() {
                       {/* Complete Deal Analysis */}
                       <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-6 border">
                         <h3 className="text-lg font-semibold text-blue-600 mb-4 border-b-2 border-blue-600 pb-2">📈 Complete Deal Analysis ({analysis.termAnalysis.dealTerm} Month Term)</h3>
-                        
+
                         {/* One-time vs Recurring Breakdown */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                           {/* One-time Hardware */}
@@ -1446,16 +1383,16 @@ export default function AdminDealsPage() {
                             <div className="space-y-2 text-sm">
                               <div className="flex justify-between">
                                 <span>Cost Price:</span>
-                                <span className="font-medium">{formatCurrency(analysis.hardware.costPrice)}</span>
+                                <span className="font-medium">{formatCurrency(analysis.breakdown.hardware.costPrice)}</span>
                               </div>
                               <div className="flex justify-between">
                                 <span>{analysis.dealInfo.userRole === 'manager' || analysis.dealInfo.userRole === 'admin' ? 'Manager' : 'User'} Price:</span>
-                                <span className="font-medium">{formatCurrency(analysis.hardware.userManagerPrice)}</span>
+                                <span className="font-medium">{formatCurrency(analysis.breakdown.hardware.userManagerPrice)}</span>
                               </div>
                               <div className="flex justify-between border-t pt-2">
                                 <span className="font-semibold">Hardware Profit:</span>
-                                <span className={`font-semibold ${analysis.hardware.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                  {formatCurrency(analysis.hardware.profit)}
+                                <span className={`font-semibold ${(analysis.breakdown.hardware.userManagerPrice - analysis.breakdown.hardware.costPrice) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                  {formatCurrency(analysis.breakdown.hardware.userManagerPrice - analysis.breakdown.hardware.costPrice)}
                                 </span>
                               </div>
                             </div>
@@ -1514,7 +1451,7 @@ export default function AdminDealsPage() {
                       {/* Hardware Deal Breakdown - Full Comparison */}
                       <div className="bg-white border rounded-lg p-6">
                         <h3 className="text-lg font-semibold text-blue-600 mb-4 border-b-2 border-blue-600 pb-2">🔍 Hardware Deal Breakdown</h3>
-                        
+
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                           {/* Rep's Calculation */}
                           <div className="bg-blue-50 rounded-lg p-4 border">
@@ -1650,7 +1587,7 @@ export default function AdminDealsPage() {
                       {/* Monthly Recurring Services Analysis */}
                       <div className="bg-white border rounded-lg p-6">
                         <h3 className="text-lg font-semibold text-blue-600 mb-4 border-b-2 border-blue-600 pb-2">📊 Monthly Recurring Services Analysis</h3>
-                        
+
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                           <div className="bg-blue-50 rounded-lg p-4 border">
                             <h4 className="font-medium text-blue-900 mb-3 text-center">Monthly Profit</h4>
@@ -1714,7 +1651,7 @@ export default function AdminDealsPage() {
 
                         {['hardware', 'connectivity', 'licensing'].map((sectionKey) => {
                           const section = analysis.breakdown[sectionKey as keyof typeof analysis.breakdown];
-                          if (!section.items.length) return null;
+                          if (!section || !section.items || !section.items.length) return null;
 
                           return (
                             <div key={sectionKey} className="mb-6">
