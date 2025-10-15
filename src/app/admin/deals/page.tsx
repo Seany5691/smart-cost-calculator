@@ -239,7 +239,7 @@ export default function AdminDealsPage() {
     // Calculate what the rep quoted using user/manager pricing
     let repInstallationSlidingScale = 0;
     const userRole = deal.userRole || 'user';
-    
+
     if (scales?.installation) {
       let installationData;
       if (userRole === 'manager' || userRole === 'admin') {
@@ -310,10 +310,10 @@ export default function AdminDealsPage() {
     // Calculate GP for both Rep and Actual
     // Rep GP = Payout - Rep Stock - Rep Installation - Settlement - Finance Fee
     const repGP = customerTotalPayout - customerHardwareTotal - repInstallationTotal - customerSettlement - customerFinanceFee;
-    
+
     // Actual GP = Payout - Actual Stock - Actual Installation - Settlement - Finance Fee
     const actualGP = customerTotalPayout - hardwareCostPrice - costInstallationTotal - customerSettlement - customerFinanceFee;
-    
+
     const hardwareDealAnalysis = {
       customer: {
         hardwareTotal: customerHardwareTotal,
