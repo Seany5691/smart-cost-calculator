@@ -95,48 +95,7 @@ function CalculatorPageContent() {
     }, 2000);
   };
 
-  // Touch/swipe navigation for mobile
-  useEffect(() => {
-    let touchStartX = 0;
-    let touchEndX = 0;
-    
-    const handleTouchStart = (event: Event) => {
-      const touchEvent = event as TouchEvent;
-      touchStartX = touchEvent.changedTouches[0].screenX;
-    };
-    
-    const handleTouchEnd = (event: Event) => {
-      const touchEvent = event as TouchEvent;
-      touchEndX = touchEvent.changedTouches[0].screenX;
-      handleSwipe();
-    };
-    
-    const handleSwipe = () => {
-      const swipeThreshold = 50; // Minimum distance for a swipe
-      const swipeDistance = touchStartX - touchEndX;
-      
-      if (Math.abs(swipeDistance) > swipeThreshold) {
-        if (swipeDistance > 0 && tabIndex < tabs.length - 1) {
-          // Swipe left - go to next tab
-          handleNextTab();
-        } else if (swipeDistance < 0 && tabIndex > 0) {
-          // Swipe right - go to previous tab
-          handlePrevTab();
-        }
-      }
-    };
-    
-    const contentArea = document.querySelector('.calculator-content');
-    if (contentArea) {
-      contentArea.addEventListener('touchstart', handleTouchStart, { passive: true });
-      contentArea.addEventListener('touchend', handleTouchEnd, { passive: true });
-      
-      return () => {
-        contentArea.removeEventListener('touchstart', handleTouchStart);
-        contentArea.removeEventListener('touchend', handleTouchEnd);
-      };
-    }
-  }, [tabIndex]);
+  // Swipe navigation removed - was causing accidental tab changes on mobile
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -473,14 +432,14 @@ function CalculatorPageContent() {
                   <button
                     key={index}
                     onClick={() => handleTabChange(index)}
-                    className={`flex items-center space-x-1 sm:space-x-2 px-3 sm:px-5 py-3 sm:py-3.5 font-semibold text-xs sm:text-sm whitespace-nowrap transition-all duration-500 border-b-3 relative group cursor-pointer touch-manipulation min-w-[70px] sm:min-w-0 ${
+                    className={`flex items-center space-x-1 sm:space-x-2 px-2 sm:px-5 py-3 sm:py-3.5 font-semibold text-xs sm:text-sm whitespace-nowrap transition-all duration-500 border-b-3 relative group cursor-pointer touch-manipulation flex-shrink-0 ${
                       isCurrent
-                        ? 'text-blue-600 border-blue-600 bg-gradient-to-br from-blue-50/80 to-indigo-50/80 backdrop-blur-sm shadow-lg transform scale-110'
+                        ? 'text-blue-600 border-blue-600 bg-gradient-to-br from-blue-50/80 to-indigo-50/80 backdrop-blur-sm shadow-lg sm:transform sm:scale-110'
                         : isCompleted
-                        ? 'text-green-600 border-green-500 bg-gradient-to-br from-green-50/60 to-emerald-50/60 backdrop-blur-sm hover:shadow-lg hover:transform hover:scale-105'
+                        ? 'text-green-600 border-green-500 bg-gradient-to-br from-green-50/60 to-emerald-50/60 backdrop-blur-sm hover:shadow-lg sm:hover:transform sm:hover:scale-105'
                         : isFuture
-                        ? 'text-gray-500 border-transparent hover:text-gray-700 hover:bg-white/40 hover:backdrop-blur-sm hover:transform hover:scale-105'
-                        : 'text-gray-500 hover:text-gray-700 hover:bg-white/40 hover:backdrop-blur-sm border-transparent hover:transform hover:scale-105'
+                        ? 'text-gray-500 border-transparent hover:text-gray-700 hover:bg-white/40 hover:backdrop-blur-sm sm:hover:transform sm:hover:scale-105'
+                        : 'text-gray-500 hover:text-gray-700 hover:bg-white/40 hover:backdrop-blur-sm border-transparent sm:hover:transform sm:hover:scale-105'
                     }`}
                   >
                     <span className={`text-lg sm:text-xl transition-all duration-300 ${
