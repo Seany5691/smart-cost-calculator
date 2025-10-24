@@ -126,7 +126,8 @@ const ProviderExport = React.memo(({ businesses }: ProviderExportProps) => {
               type="checkbox"
               checked={selectedProviders.has(provider)}
               onChange={() => handleToggleProvider(provider)}
-              className="w-3 h-3 text-blue-600 rounded focus:ring-1 focus:ring-blue-500 cursor-pointer flex-shrink-0"
+              className="w-[14px] h-[14px] text-blue-600 rounded focus:ring-1 focus:ring-blue-500 cursor-pointer flex-shrink-0"
+              style={{ minWidth: '14px', minHeight: '14px' }}
             />
             <span className={`text-xs sm:text-sm flex-1 ${
               selectedProviders.has(provider) ? 'text-white font-medium' : 'text-gray-700'

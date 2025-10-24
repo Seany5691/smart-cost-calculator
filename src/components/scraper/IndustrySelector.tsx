@@ -107,7 +107,8 @@ export default function IndustrySelector({
                 checked={selectedIndustries.includes(industry)}
                 onChange={() => handleToggleIndustry(industry)}
                 disabled={disabled}
-                className="w-3 h-3 text-blue-600 rounded focus:ring-1 focus:ring-blue-500 flex-shrink-0"
+                className="w-[14px] h-[14px] text-blue-600 rounded focus:ring-1 focus:ring-blue-500 flex-shrink-0"
+                style={{ minWidth: '14px', minHeight: '14px' }}
               />
               <span className={`text-xs sm:text-sm flex-1 ${
                 selectedIndustries.includes(industry) ? 'text-white font-medium' : 'text-gray-700'
