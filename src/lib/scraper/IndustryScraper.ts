@@ -33,11 +33,11 @@ export class IndustryScraper {
       const searchQuery = `${this.industry} in ${this.town}`;
       const url = `https://www.google.com/maps/search/${encodeURIComponent(searchQuery)}`;
       
-      // Use 'domcontentloaded' for better reliability in serverless
-      await this.page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      // Use 'networkidle2' for better reliability - wait until network is mostly idle
+      await this.page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
       
-      // Wait for results to load
-      await this.page.waitForSelector('[role="feed"]', { timeout: 10000 });
+      // Wait for results to load with longer timeout
+      await this.page.waitForSelector('[role="feed"]', { timeout: 20000 });
       
       // Extract business data from list view (scrolling is integrated)
       const businesses = await this.extractFromListView();

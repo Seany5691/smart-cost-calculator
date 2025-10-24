@@ -18,6 +18,10 @@ interface ScraperState {
   sessionId: string | null;
   eventSource: EventSource | null;
   
+  // Polling state (replaces SSE for serverless)
+  _pollingInterval: NodeJS.Timeout | null;
+  _isPolling: boolean;
+  
   // Configuration
   config: ScrapingConfig;
   towns: string[];
@@ -58,6 +62,12 @@ interface ScraperState {
   resumeScraping: () => Promise<void>;
   connectToSSE: (sessionId: string) => void;
   disconnectSSE: () => void;
+  
+  // Polling actions (new serverless approach)
+  startPolling: (sessionId: string) => void;
+  stopPolling: () => void;
+  pollStatus: () => Promise<void>;
+  processNextTown: () => Promise<void>;
 }
 
 const defaultConfig: ScrapingConfig = {
@@ -88,6 +98,8 @@ export const useScraperStore = create<ScraperState>()(
       status: 'idle',
       sessionId: null,
       eventSource: null,
+      _pollingInterval: null,
+      _isPolling: false,
       config: defaultConfig,
       towns: [],
       industries: [],
@@ -258,9 +270,9 @@ export const useScraperStore = create<ScraperState>()(
           
           const data: StartScrapeResponse = await response.json();
           
-          // Set session ID and connect to SSE
-          set({ sessionId: data.sessionId });
-          get().connectToSSE(data.sessionId);
+          // Set session ID and start polling (serverless-compatible)
+          set({ sessionId: data.sessionId, status: 'running' });
+          get().startPolling(data.sessionId);
           
           // Update progress with start time
           get().updateProgress({
@@ -297,6 +309,9 @@ export const useScraperStore = create<ScraperState>()(
         }
         
         try {
+          // Stop polling
+          get().stopPolling();
+          
           // Call API to stop scraping
           const response = await fetch(`/api/scrape/stop/${state.sessionId}`, {
             method: 'POST',
@@ -309,7 +324,7 @@ export const useScraperStore = create<ScraperState>()(
           
           const data: StopScrapeResponse = await response.json();
           
-          // Disconnect SSE
+          // Disconnect SSE (legacy)
           get().disconnectSSE();
           
           // Update status
@@ -562,6 +577,111 @@ export const useScraperStore = create<ScraperState>()(
         if (state.eventSource) {
           state.eventSource.close();
           set({ eventSource: null });
+        }
+      },
+
+      // NEW: Polling-based approach for serverless
+      startPolling: (sessionId: string) => {
+        console.log('[Polling] Starting polling for session:', sessionId);
+        
+        // Stop any existing polling
+        get().stopPolling();
+        
+        set({ _isPolling: true });
+        
+        // Start polling loop
+        const interval = setInterval(async () => {
+          if (!get()._isPolling) {
+            clearInterval(interval);
+            return;
+          }
+          
+          await get().pollStatus();
+          await get().processNextTown();
+        }, 3000); // Poll every 3 seconds
+        
+        set({ _pollingInterval: interval });
+        
+        // Do first poll immediately
+        get().pollStatus();
+        get().processNextTown();
+      },
+
+      stopPolling: () => {
+        console.log('[Polling] Stopping polling');
+        const state = get();
+        
+        if (state._pollingInterval) {
+          clearInterval(state._pollingInterval);
+        }
+        
+        set({ _pollingInterval: null, _isPolling: false });
+      },
+
+      pollStatus: async () => {
+        const state = get();
+        if (!state.sessionId) return;
+
+        try {
+          const response = await fetch(`/api/scrape/status-poll/${state.sessionId}`, {
+            headers: getAuthHeaders(),
+          });
+
+          if (!response.ok) {
+            console.error('[Polling] Status check failed:', response.status);
+            return;
+          }
+
+          const data = await response.json();
+          
+          // Update state from Supabase
+          set({
+            status: data.status,
+            progress: data.progress,
+            businesses: data.businesses,
+            logs: data.logs,
+          });
+
+          // Stop polling if completed or stopped
+          if (data.status === 'completed' || data.status === 'stopped' || data.status === 'error') {
+            get().stopPolling();
+            
+            if (data.status === 'completed') {
+              get().addLog({
+                timestamp: new Date().toISOString(),
+                message: `✅ Scraping completed! Total: ${data.businesses.length} businesses`,
+                level: 'success',
+              });
+            }
+          }
+        } catch (error) {
+          console.error('[Polling] Error polling status:', error);
+        }
+      },
+
+      processNextTown: async () => {
+        const state = get();
+        if (!state.sessionId) return;
+        if (state.status !== 'running' && state.status !== 'pending') return;
+
+        try {
+          const response = await fetch('/api/scrape/process', {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ sessionId: state.sessionId }),
+          });
+
+          if (!response.ok) {
+            console.error('[Polling] Process failed:', response.status);
+            return;
+          }
+
+          const data = await response.json();
+          console.log('[Polling] Process response:', data);
+          
+          // Status will be updated by pollStatus
+        } catch (error) {
+          console.error('[Polling] Error processing:', error);
         }
       },
     }),

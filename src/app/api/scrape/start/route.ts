@@ -5,13 +5,11 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { EventEmitter } from 'events';
-import { ScrapingOrchestrator } from '@/lib/scraper/ScrapingOrchestrator';
-import { StartScrapeRequest, StartScrapeResponse, ScrapingConfig } from '@/lib/scraper/types';
+import { StartScrapeRequest, StartScrapeResponse } from '@/lib/scraper/types';
 import { randomUUID } from 'crypto';
-import { setSession } from '@/lib/scraper/sessionStore';
+import { createSession } from '@/lib/scraper/supabaseSessionStore';
 import { errorLogger } from '@/lib/scraper/ErrorLogger';
-import { requireScraperAuth } from '@/lib/auth-middleware';
+import { requireScraperAuth, getAuthenticatedUser } from '@/lib/auth-middleware';
 
 export async function POST(request: NextRequest) {
   // Check authentication and authorization
@@ -102,44 +100,15 @@ export async function POST(request: NextRequest) {
     // Generate unique session ID
     const sessionId = randomUUID();
 
-    // Create event emitter for this session
-    const eventEmitter = new EventEmitter();
+    // Get user info
+    const user = getAuthenticatedUser(request);
+    const userId = user?.id || 'anonymous';
 
-    // Create scraping orchestrator
-    const orchestrator = new ScrapingOrchestrator(
-      cleanedTowns,
-      body.industries,
-      config,
-      eventEmitter
-    );
-
-    // Store session in memory
-    setSession(sessionId, {
-      orchestrator,
-      eventEmitter,
-      createdAt: Date.now()
-    });
-
-    // Start scraping in background (don't await)
-    orchestrator.start().catch(error => {
-      errorLogger.logError(`Scraping session ${sessionId} failed`, error, {
-        sessionId,
-        operation: 'orchestrator_background_start',
-        towns: cleanedTowns,
-        industries: body.industries
-      });
-      console.error(`[CRITICAL] Scraping session ${sessionId} failed:`, error);
-      console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
-      
-      // Emit error event so client knows
-      eventEmitter.emit('error', {
-        error: error instanceof Error ? error.message : String(error)
-      });
-      // Session will remain in memory for status queries
-    });
+    // Create session in Supabase
+    await createSession(sessionId, userId, cleanedTowns, body.industries, config);
     
     // Log that we're starting
-    console.log(`[INFO] Scraping session ${sessionId} started for ${cleanedTowns.length} town(s) and ${body.industries.length} industry(ies)`);
+    console.log(`[INFO] Scraping session ${sessionId} created for ${cleanedTowns.length} town(s) and ${body.industries.length} industry(ies)`);
 
     // Return session ID immediately
     const response: StartScrapeResponse = {

@@ -65,13 +65,33 @@ export async function GET(
   const { sessionId } = await params;
 
   console.log(`[SSE] Client connecting to session: ${sessionId}`);
+  console.log(`[SSE] NOTE: SSE is deprecated. Please use /api/scrape/status-poll for serverless compatibility`);
 
-  // Validate session exists
+  // Check Supabase first (new approach)
+  const { getSession: getSupabaseSession } = await import('@/lib/scraper/supabaseSessionStore');
+  const supabaseSession = await getSupabaseSession(sessionId);
+  
+  if (supabaseSession) {
+    console.log(`[SSE] Session found in Supabase, redirecting to polling approach`);
+    return new Response(
+      JSON.stringify({ 
+        error: 'Please use /api/scrape/status-poll for serverless compatibility',
+        sessionId,
+        status: supabaseSession.status
+      }),
+      {
+        status: 410, // Gone - resource no longer available
+        headers: { 'Content-Type': 'application/json' }
+      }
+    );
+  }
+
+  // Fallback to old in-memory approach (for backward compatibility)
   const session = getSession(sessionId);
   if (!session) {
-    console.log(`[SSE] Session not found: ${sessionId}`);
+    console.log(`[SSE] Session not found in memory or Supabase: ${sessionId}`);
     return new Response(
-      JSON.stringify({ error: 'Session not found' }),
+      JSON.stringify({ error: 'Session not found. Use /api/scrape/status-poll for new sessions.' }),
       {
         status: 404,
         headers: { 'Content-Type': 'application/json' }
@@ -79,7 +99,7 @@ export async function GET(
     );
   }
 
-  console.log(`[SSE] Session found, establishing SSE connection for: ${sessionId}`);
+  console.log(`[SSE] Session found in memory, establishing SSE connection for: ${sessionId}`);
 
   const { orchestrator, eventEmitter } = session;
 
