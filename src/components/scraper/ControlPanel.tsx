@@ -41,37 +41,37 @@ export default function ControlPanel({
   const isActive = isRunning || isPaused;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2 sm:space-y-4">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="p-2 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-lg shadow-lg">
-          <Gamepad2 className="w-5 h-5 text-white" />
+      <div className="flex items-center gap-2 sm:gap-3">
+        <div className="p-1.5 sm:p-2 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-lg shadow-lg">
+          <Gamepad2 className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
         </div>
         <div>
-          <h3 className="text-lg font-bold text-gray-900">
+          <h3 className="text-base sm:text-lg font-bold text-gray-900">
             Controls
           </h3>
-          <p className="text-xs text-gray-600">
+          <p className="text-xs text-gray-600 hidden sm:block">
             Start, stop, and manage scraping
           </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+      <div className="grid grid-cols-3 gap-2">
         {/* Start Button */}
         <button
           type="button"
           onClick={onStart}
           disabled={isActive}
-          className="btn btn-success flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="btn btn-success flex items-center justify-center gap-1 sm:gap-2 text-xs sm:text-sm py-2 disabled:opacity-50 disabled:cursor-not-allowed"
           title="Start scraping"
         >
           {isRunning ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
+            <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 animate-spin" />
           ) : (
-            <Play className="w-4 h-4" />
+            <Play className="w-3 h-3 sm:w-4 sm:h-4" />
           )}
-          <span className="hidden sm:inline">Start</span>
+          <span>Start</span>
         </button>
 
         {/* Stop Button */}
@@ -79,15 +79,16 @@ export default function ControlPanel({
           type="button"
           onClick={onStop}
           disabled={!isActive}
-          className="btn btn-danger flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="btn btn-danger flex items-center justify-center gap-1 sm:gap-2 text-xs sm:text-sm py-2 disabled:opacity-50 disabled:cursor-not-allowed"
           title="Stop scraping"
         >
-          <Square className="w-4 h-4" />
-          <span className="hidden sm:inline">Stop</span>
+          <Square className="w-3 h-3 sm:w-4 sm:h-4" />
+          <span>Stop</span>
         </button>
 
-        {/* Pause/Resume Button */}
-        <button
+        {/* Pause/Resume Button - Disabled for serverless architecture */}
+        {/* Serverless processes towns sequentially and cannot be paused mid-town */}
+        {/* <button
           type="button"
           onClick={isPaused ? onResume : onPause}
           disabled={!isActive}
@@ -96,40 +97,40 @@ export default function ControlPanel({
         >
           <Pause className="w-4 h-4" />
           <span className="hidden sm:inline">{isPaused ? 'Resume' : 'Pause'}</span>
-        </button>
+        </button> */}
 
         {/* Export Button */}
         <button
           type="button"
           onClick={onExport}
           disabled={!hasData || isActive || isExporting}
-          className="btn btn-primary flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="btn btn-primary flex items-center justify-center gap-1 sm:gap-2 text-xs sm:text-sm py-2 disabled:opacity-50 disabled:cursor-not-allowed"
           title="Export to Excel"
         >
           {isExporting ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
+            <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 animate-spin" />
           ) : (
-            <Download className="w-4 h-4" />
+            <Download className="w-3 h-3 sm:w-4 sm:h-4" />
           )}
-          <span className="hidden sm:inline">{isExporting ? 'Exporting...' : 'Export'}</span>
+          <span>{isExporting ? 'Export...' : 'Export'}</span>
         </button>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+      <div className="grid grid-cols-3 gap-2">
         {/* Save Button */}
         <button
           type="button"
           onClick={onSave}
           disabled={!hasData || isActive || isSaving}
-          className="btn btn-secondary flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="btn btn-secondary flex items-center justify-center gap-1 sm:gap-2 text-xs sm:text-sm py-2 disabled:opacity-50 disabled:cursor-not-allowed"
           title="Save session"
         >
           {isSaving ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
+            <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 animate-spin" />
           ) : (
-            <Save className="w-4 h-4" />
+            <Save className="w-3 h-3 sm:w-4 sm:h-4" />
           )}
-          <span className="hidden sm:inline">{isSaving ? 'Saving...' : 'Save'}</span>
+          <span>{isSaving ? 'Save...' : 'Save'}</span>
         </button>
 
         {/* Load Button */}
@@ -137,15 +138,15 @@ export default function ControlPanel({
           type="button"
           onClick={onLoad}
           disabled={isActive || isLoading}
-          className="btn btn-secondary flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="btn btn-secondary flex items-center justify-center gap-1 sm:gap-2 text-xs sm:text-sm py-2 disabled:opacity-50 disabled:cursor-not-allowed"
           title="Load session"
         >
           {isLoading ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
+            <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 animate-spin" />
           ) : (
-            <FolderOpen className="w-4 h-4" />
+            <FolderOpen className="w-3 h-3 sm:w-4 sm:h-4" />
           )}
-          <span className="hidden sm:inline">{isLoading ? 'Loading...' : 'Load'}</span>
+          <span>{isLoading ? 'Load...' : 'Load'}</span>
         </button>
 
         {/* Clear Button */}

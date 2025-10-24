@@ -349,14 +349,14 @@ function ScraperPageContent() {
   }
 
   return (
-    <main className="min-h-screen p-4 sm:p-6 lg:p-8">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <main className="min-h-screen p-2 sm:p-4 lg:p-8">
+      <div className="max-w-7xl mx-auto space-y-3 sm:space-y-6">
         {/* Header */}
-        <div className="glass-card p-6">
-          <h1 className="text-3xl sm:text-4xl font-bold gradient-text mb-2">
+        <div className="glass-card p-3 sm:p-6">
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold gradient-text mb-1 sm:mb-2">
             Smart Scrape
           </h1>
-          <p className="text-gray-600">
+          <p className="text-xs sm:text-sm text-gray-600">
             Scrape business data from Google Maps for multiple towns and industries
           </p>
         </div>
@@ -364,24 +364,24 @@ function ScraperPageContent() {
 
 
         {/* Lookup Tools - Side by Side */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-6">
           {/* Number Lookup */}
-          <div className="glass-card p-4">
+          <div className="glass-card p-3 sm:p-4">
             <NumberLookup />
           </div>
 
           {/* Business Lookup */}
-          <div className="glass-card p-4">
+          <div className="glass-card p-3 sm:p-4">
             <BusinessLookup />
           </div>
         </div>
 
         {/* Progress & Summary Stats (Top Section) */}
         {(isActive || status === 'completed' || status === 'stopped' || hasData) && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-6">
             {/* Progress Display */}
             {(isActive || status === 'completed' || status === 'stopped') && (
-              <div className="glass-card p-4">
+              <div className="glass-card p-3 sm:p-4">
                 <ProgressDisplay
                   percentage={progressPercentage}
                   townsRemaining={progress.totalTowns - progress.completedTowns}
@@ -395,7 +395,7 @@ function ScraperPageContent() {
 
             {/* Summary Stats */}
             {(status === 'completed' || status === 'stopped') && hasData && (
-              <div className="glass-card p-4">
+              <div className="glass-card p-3 sm:p-4">
                 <SummaryStats {...summaryStats} />
               </div>
             )}
@@ -403,9 +403,9 @@ function ScraperPageContent() {
         )}
 
         {/* Configuration Section - Paired Cards */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-6">
           {/* Row 1: Towns & Industries */}
-          <div className="glass-card p-6 h-full">
+          <div className="glass-card p-3 sm:p-6 h-full">
             <TownInput
               value={townInput}
               onChange={handleTownInputChange}
@@ -413,7 +413,7 @@ function ScraperPageContent() {
             />
           </div>
 
-          <div className="glass-card p-6 h-full">
+          <div className="glass-card p-3 sm:p-6 h-full">
             <IndustrySelector
               industries={availableIndustries}
               selectedIndustries={selectedIndustries}
@@ -425,7 +425,7 @@ function ScraperPageContent() {
           </div>
 
           {/* Row 2: Controls & Concurrency */}
-          <div className="glass-card p-6 h-full">
+          <div className="glass-card p-3 sm:p-6 h-full">
             <ControlPanel
               status={status}
               onStart={handleStart}
@@ -443,7 +443,7 @@ function ScraperPageContent() {
             />
           </div>
 
-          <div className="glass-card p-6 h-full">
+          <div className="glass-card p-3 sm:p-6 h-full">
             <ConcurrencyControls
               simultaneousTowns={config.simultaneousTowns}
               simultaneousIndustries={config.simultaneousIndustries}
@@ -456,17 +456,17 @@ function ScraperPageContent() {
           </div>
 
           {/* Row 3: Activity Log & Provider Export */}
-          <div className="glass-card p-6 h-full">
+          <div className="glass-card p-3 sm:p-6 h-full">
             <LogViewer logs={logs} autoScroll={true} />
           </div>
 
           {hasData ? (
-            <div className="glass-card p-6 h-full">
+            <div className="glass-card p-3 sm:p-6 h-full">
               <ProviderExport businesses={businesses} />
             </div>
           ) : (
-            <div className="glass-card p-6 h-full flex items-center justify-center">
-              <p className="text-gray-400 text-center">
+            <div className="glass-card p-3 sm:p-6 h-full flex items-center justify-center">
+              <p className="text-xs sm:text-sm text-gray-400 text-center">
                 Provider export will appear here after scraping
               </p>
             </div>
@@ -475,7 +475,7 @@ function ScraperPageContent() {
 
         {/* View All Results (Dropdown) */}
         {hasData && (
-          <div className="glass-card p-6">
+          <div className="glass-card p-3 sm:p-6">
             <ViewAllResults businesses={businesses} />
           </div>
         )}
