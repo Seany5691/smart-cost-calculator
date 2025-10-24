@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { StopScrapeResponse } from '@/lib/scraper/types';
-import { getSession, updateSessionStatus, getBusinesses } from '@/lib/scraper/supabaseSessionStore';
+import { getSession, updateSessionStatus, getSessionBusinesses } from '@/lib/scraper/supabaseSessionStore';
 import { requireScraperAuth } from '@/lib/auth-middleware';
 
 export async function POST(
@@ -30,7 +30,7 @@ export async function POST(
     }
 
     // Get current business count
-    const businesses = await getBusinesses(sessionId);
+    const businesses = await getSessionBusinesses(sessionId);
     const businessCount = businesses.length;
 
     // Update session status to stopped

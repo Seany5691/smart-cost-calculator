@@ -205,15 +205,29 @@ export async function POST(request: NextRequest) {
       level: 'success'
     });
 
+    // Check if this was the last town
+    const hasMore = currentTownIndex + 1 < towns.length;
+    const finalStatus = hasMore ? 'running' : 'completed';
+    
+    // If completed, update status in database
+    if (!hasMore) {
+      await updateSessionStatus(sessionId, 'completed');
+      await addLog(sessionId, {
+        timestamp: new Date().toISOString(),
+        message: `✅ Scraping completed! Total businesses: ${(progress.totalBusinesses || 0) + townBusinesses.length}`,
+        level: 'success'
+      });
+    }
+    
     // Return status
     return NextResponse.json({
-      status: 'running',
+      status: finalStatus,
       progress: {
         completedTowns: currentTownIndex + 1,
         totalTowns: towns.length,
         totalBusinesses: (progress.totalBusinesses || 0) + townBusinesses.length
       },
-      hasMore: currentTownIndex + 1 < towns.length
+      hasMore
     });
 
   } catch (error) {
