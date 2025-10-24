@@ -122,9 +122,15 @@ export async function POST(request: NextRequest) {
             const providerResults = await providerService.lookupProviders(phoneNumbers);
             await providerService.cleanup();
 
+            // Debug: Log what's in the results map
+            console.log('[Process] Provider results map keys:', Array.from(providerResults.keys()));
+            console.log('[Process] Business phone numbers:', businesses.map(b => b.phone));
+
             businesses.forEach(business => {
               if (business.phone && business.phone !== 'No phone') {
-                business.provider = providerResults.get(business.phone) || 'Unknown';
+                const provider = providerResults.get(business.phone);
+                console.log(`[Process] Mapping ${business.phone} -> ${provider || 'Unknown'}`);
+                business.provider = provider || 'Unknown';
               } else {
                 business.provider = 'Unknown';
               }
