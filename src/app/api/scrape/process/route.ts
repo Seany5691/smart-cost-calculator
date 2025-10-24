@@ -125,6 +125,16 @@ export async function POST(request: NextRequest) {
             // Debug: Log what's in the results map
             console.log('[Process] Provider results map keys:', Array.from(providerResults.keys()));
             console.log('[Process] Business phone numbers:', businesses.map(b => b.phone));
+            
+            // Debug: Log the actual provider values in the map
+            const providerValues = Array.from(providerResults.entries());
+            console.log('[Process] Provider map entries:', providerValues);
+            
+            await addLog(sessionId, {
+              timestamp: new Date().toISOString(),
+              message: `Debug - Map has ${providerResults.size} entries. Sample: ${providerValues.slice(0, 2).map(([k, v]) => `${k}=${v}`).join(', ')}`,
+              level: 'info'
+            });
 
             businesses.forEach(business => {
               if (business.phone && business.phone !== 'No phone') {
