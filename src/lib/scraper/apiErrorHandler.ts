@@ -140,4 +140,6 @@ export async function handleApiRoute<T>(
     return await handler();
   } catch (error) {
     const statusCode = getErrorStatusCode(error);
-    return createErrorResponse(endpoint, error, statusCode,
+    return createErrorResponse(endpoint, error, statusCode, context);
+  }
+}
