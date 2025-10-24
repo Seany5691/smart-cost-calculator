@@ -172,7 +172,8 @@ export default function UserManagement() {
         </button>
       </div>
 
-      <div className="card">
+      {/* Desktop Table View */}
+      <div className="hidden md:block card">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
@@ -413,6 +414,259 @@ export default function UserManagement() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* Mobile Card View */}
+      <div className="md:hidden space-y-3">
+        {/* Existing users */}
+        {users.map((user) => (
+          <div key={user.id} className="bg-white/60 backdrop-blur-sm rounded-lg p-3 shadow-sm border border-gray-200">
+            {/* User Header */}
+            <div className="flex justify-between items-start mb-3">
+              <div className="flex-1">
+                {editingUser === user.id ? (
+                  <input
+                    type="text"
+                    value={editingUserData.name || ''}
+                    onChange={(e) => handleUpdateUser(user.id, { name: e.target.value })}
+                    className="input w-full text-sm font-semibold mb-1"
+                    placeholder="Enter full name"
+                  />
+                ) : (
+                  <h3 className="font-semibold text-sm text-gray-900">{user.name}</h3>
+                )}
+                {editingUser === user.id ? (
+                  <input
+                    type="text"
+                    value={editingUserData.username || ''}
+                    onChange={(e) => handleUpdateUser(user.id, { username: e.target.value })}
+                    className="input w-full text-xs mt-1"
+                    placeholder="Enter username"
+                    disabled={user.username === 'Camryn'}
+                  />
+                ) : (
+                  <p className="text-xs text-gray-600">@{user.username}</p>
+                )}
+              </div>
+              <div className="ml-2">
+                {editingUser === user.id ? (
+                  <select
+                    value={editingUserData.role || 'user'}
+                    onChange={(e) => handleUpdateUser(user.id, { role: e.target.value as 'admin' | 'manager' | 'user' })}
+                    className="input text-xs p-1"
+                    disabled={user.username === 'Camryn'}
+                  >
+                    <option value="user">User</option>
+                    <option value="manager">Manager</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                ) : (
+                  <div className="flex items-center space-x-1">
+                    {getRoleIcon(user.role)}
+                    <span className={`px-2 py-0.5 rounded-full text-xs ${getRoleColor(user.role)}`}>
+                      {user.role}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* User Details */}
+            <div className="space-y-2 text-xs mb-3 bg-gray-50 rounded-lg p-2">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Email:</span>
+                {editingUser === user.id ? (
+                  <input
+                    type="email"
+                    value={editingUserData.email || ''}
+                    onChange={(e) => handleUpdateUser(user.id, { email: e.target.value })}
+                    className="input text-xs p-1 flex-1 ml-2"
+                    placeholder="user@company.com"
+                  />
+                ) : (
+                  <span className="font-medium text-gray-900">{user.email}</span>
+                )}
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600">Status:</span>
+                {editingUser === user.id ? (
+                  <label className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      checked={editingUserData.isActive || false}
+                      onChange={(e) => handleUpdateUser(user.id, { isActive: e.target.checked })}
+                      className="w-4 h-4 text-blue-600"
+                      disabled={user.username === 'Camryn'}
+                    />
+                    <span className="text-xs">Active</span>
+                  </label>
+                ) : (
+                  <span className={`px-2 py-0.5 rounded-full text-xs ${
+                    user.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                  }`}>
+                    {user.isActive ? 'Active' : 'Inactive'}
+                  </span>
+                )}
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600">Password:</span>
+                <div className="flex items-center space-x-2">
+                  <span className={`px-2 py-0.5 rounded-full text-xs ${
+                    user.requiresPasswordChange 
+                      ? 'bg-orange-100 text-orange-800' 
+                      : 'bg-green-100 text-green-800'
+                  }`}>
+                    {user.requiresPasswordChange ? 'Change Required' : 'Set'}
+                  </span>
+                  {user.username !== 'Camryn' && editingUser !== user.id && (
+                    <button
+                      onClick={() => handleResetPassword(user.id)}
+                      className="p-1.5 text-blue-600 hover:text-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded touch-manipulation active:scale-95"
+                      title="Reset Password"
+                      aria-label={`Reset password for ${user.name}`}
+                    >
+                      <Lock className="w-4 h-4" aria-hidden="true" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-2">
+              {editingUser === user.id ? (
+                <>
+                  <button
+                    onClick={() => handleSaveUser(user.id)}
+                    className="flex-1 flex items-center justify-center gap-1 px-3 py-2 bg-green-600 text-white rounded-lg text-sm font-medium touch-manipulation active:scale-95 min-h-[44px]"
+                    aria-label={`Save changes for ${user.name}`}
+                  >
+                    <Check className="w-4 h-4" aria-hidden="true" />
+                    <span>Save</span>
+                  </button>
+                  <button
+                    onClick={handleCancelEdit}
+                    className="flex-1 flex items-center justify-center gap-1 px-3 py-2 bg-gray-500 text-white rounded-lg text-sm font-medium touch-manipulation active:scale-95 min-h-[44px]"
+                    aria-label="Cancel editing"
+                  >
+                    <X className="w-4 h-4" aria-hidden="true" />
+                    <span>Cancel</span>
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={() => handleEditUser(user.id)}
+                    className="flex-1 flex items-center justify-center gap-1 px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium touch-manipulation active:scale-95 min-h-[44px]"
+                    aria-label={`Edit ${user.name}`}
+                  >
+                    <Edit className="w-4 h-4" aria-hidden="true" />
+                    <span>Edit</span>
+                  </button>
+                  {user.username !== 'Camryn' && (
+                    <button
+                      onClick={() => handleDeleteUser(user.id)}
+                      className="flex-1 flex items-center justify-center gap-1 px-3 py-2 bg-red-600 text-white rounded-lg text-sm font-medium touch-manipulation active:scale-95 min-h-[44px]"
+                      aria-label={`Delete ${user.name}`}
+                    >
+                      <Trash2 className="w-4 h-4" aria-hidden="true" />
+                      <span>Delete</span>
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        ))}
+
+        {/* New user card when adding */}
+        {editingUser && !users.find(u => u.id === editingUser) && (
+          <div className="bg-blue-50 backdrop-blur-sm rounded-lg p-3 shadow-sm border-2 border-blue-300">
+            {/* User Header */}
+            <div className="flex justify-between items-start mb-3">
+              <div className="flex-1">
+                <input
+                  type="text"
+                  value={editingUserData.name || ''}
+                  onChange={(e) => handleUpdateUser(editingUser, { name: e.target.value })}
+                  className="input w-full text-sm font-semibold mb-1"
+                  placeholder="Enter full name"
+                />
+                <input
+                  type="text"
+                  value={editingUserData.username || ''}
+                  onChange={(e) => handleUpdateUser(editingUser, { username: e.target.value })}
+                  className="input w-full text-xs mt-1"
+                  placeholder="Enter username"
+                />
+              </div>
+              <div className="ml-2">
+                <select
+                  value={editingUserData.role || 'user'}
+                  onChange={(e) => handleUpdateUser(editingUser, { role: e.target.value as 'admin' | 'manager' | 'user' })}
+                  className="input text-xs p-1"
+                >
+                  <option value="user">User</option>
+                  <option value="manager">Manager</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </div>
+            </div>
+
+            {/* User Details */}
+            <div className="space-y-2 text-xs mb-3 bg-white rounded-lg p-2">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Email:</span>
+                <input
+                  type="email"
+                  value={editingUserData.email || ''}
+                  onChange={(e) => handleUpdateUser(editingUser, { email: e.target.value })}
+                  className="input text-xs p-1 flex-1 ml-2"
+                  placeholder="user@company.com"
+                />
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600">Status:</span>
+                <label className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    checked={editingUserData.isActive || false}
+                    onChange={(e) => handleUpdateUser(editingUser, { isActive: e.target.checked })}
+                    className="w-4 h-4 text-blue-600"
+                  />
+                  <span className="text-xs">Active</span>
+                </label>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600">Password:</span>
+                <span className="px-2 py-0.5 rounded-full text-xs bg-orange-100 text-orange-800">
+                  Change Required
+                </span>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleSaveUser(editingUser)}
+                disabled={!editingUserData.name || !editingUserData.username || !editingUserData.email}
+                className="flex-1 flex items-center justify-center gap-1 px-3 py-2 bg-green-600 text-white rounded-lg text-sm font-medium touch-manipulation active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
+                aria-label="Save new user"
+              >
+                <Check className="w-4 h-4" aria-hidden="true" />
+                <span>Save</span>
+              </button>
+              <button
+                onClick={handleCancelEdit}
+                className="flex-1 flex items-center justify-center gap-1 px-3 py-2 bg-gray-500 text-white rounded-lg text-sm font-medium touch-manipulation active:scale-95 min-h-[44px]"
+                aria-label="Cancel adding user"
+              >
+                <X className="w-4 h-4" aria-hidden="true" />
+                <span>Cancel</span>
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="bg-blue-50 p-4 rounded-lg">

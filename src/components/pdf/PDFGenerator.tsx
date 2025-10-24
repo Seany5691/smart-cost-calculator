@@ -368,6 +368,25 @@ export default function PDFGenerator({ onGenerate, customTotals }: PDFGeneratorP
         }, 1000);
       }
 
+      // Log activity: pdf_generated
+      try {
+        const { logActivity } = await import('@/lib/activityLogger');
+        const { currentDealId } = useCalculatorStore.getState();
+        
+        if (user) {
+          logActivity({
+            userId: user.id,
+            username: user.username,
+            userRole: user.role,
+            activityType: 'pdf_generated',
+            dealId: currentDealId || undefined,
+            dealName: dealDetails.customerName
+          });
+        }
+      } catch (logError) {
+        console.warn('Failed to log pdf_generated activity:', logError);
+      }
+
       setToast({
         show: true,
         title: 'Report Generated Successfully',

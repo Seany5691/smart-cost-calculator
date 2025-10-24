@@ -1,21 +1,39 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth';
 import Link from 'next/link';
-import { Calculator, Settings, FileText, Users, ArrowRight, Clock, FolderOpen, Sparkles, TrendingUp } from 'lucide-react';
+import { Calculator, Settings, FileText, Users, ArrowRight, Clock, FolderOpen, Sparkles, TrendingUp, Search } from 'lucide-react';
 import { AnimatedBackground, GlassCard, GradientText, StatCard } from '@/components/ui/modern';
+import ActivityTimeline from '@/components/dashboard/ActivityTimeline';
+import { getTotalDeals, getActiveProjects, getTotalCalculations } from '@/lib/dashboardStats';
 
 export default function DashboardPage() {
   const { user, checkAuth } = useAuthStore();
   const router = useRouter();
+  const [stats, setStats] = useState({
+    totalDeals: 0,
+    activeProjects: 0,
+    calculations: 0
+  });
 
   useEffect(() => {
     if (!checkAuth()) {
       router.push('/login');
     }
   }, [checkAuth, router]);
+
+  useEffect(() => {
+    if (user) {
+      const isAdmin = user.role === 'admin';
+      setStats({
+        totalDeals: getTotalDeals(user.id, isAdmin),
+        activeProjects: getActiveProjects(user.id, isAdmin),
+        calculations: getTotalCalculations(user.id, isAdmin)
+      });
+    }
+  }, [user]);
 
   if (!user) {
     return null;
@@ -45,7 +63,15 @@ export default function DashboardPage() {
       href: user?.role === 'admin' ? '/admin/deals' : '/deals',
       color: 'bg-indigo-500',
       textColor: 'text-indigo-500'
-    }
+    },
+    ...(user.role === 'admin' || user.role === 'manager' ? [{
+      title: 'Smart Scraper',
+      description: 'Scrape business data from Google Maps',
+      icon: Search,
+      href: '/scraper',
+      color: 'bg-teal-500',
+      textColor: 'text-teal-500'
+    }] : [])
   ];
 
   // Add admin-specific actions
@@ -90,37 +116,6 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      {/* Stats Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 relative z-10">
-        <StatCard
-          label="Total Deals"
-          value={0}
-          icon={FileText}
-          trend={0}
-          animated
-          className="animate-fade-in-up"
-          style={{ animationDelay: '0.1s' } as React.CSSProperties}
-        />
-        <StatCard
-          label="Active Projects"
-          value={0}
-          icon={TrendingUp}
-          trend={0}
-          animated
-          className="animate-fade-in-up"
-          style={{ animationDelay: '0.2s' } as React.CSSProperties}
-        />
-        <StatCard
-          label="Calculations"
-          value={0}
-          icon={Calculator}
-          trend={0}
-          animated
-          className="animate-fade-in-up"
-          style={{ animationDelay: '0.3s' } as React.CSSProperties}
-        />
-      </div>
-
       {/* Quick Actions Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8 relative z-10">
         {quickActions.map((action, index) => {
@@ -130,7 +125,7 @@ export default function DashboardPage() {
               key={index}
               href={action.href}
               className="block animate-fade-in-up"
-              style={{ animationDelay: `${0.4 + index * 0.1}s` }}
+              style={{ animationDelay: `${0.1 + index * 0.1}s` }}
             >
               <GlassCard className="h-full p-6">
                 <div className="flex items-start space-x-4">
@@ -153,8 +148,39 @@ export default function DashboardPage() {
         })}
       </div>
 
+      {/* Stats Overview */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 relative z-10">
+        <StatCard
+          label="Total Deals"
+          value={stats.totalDeals}
+          icon={FileText}
+          trend={0}
+          animated
+          className="animate-fade-in-up"
+          style={{ animationDelay: '0.7s' } as React.CSSProperties}
+        />
+        <StatCard
+          label="Active Projects"
+          value={stats.activeProjects}
+          icon={TrendingUp}
+          trend={0}
+          animated
+          className="animate-fade-in-up"
+          style={{ animationDelay: '0.8s' } as React.CSSProperties}
+        />
+        <StatCard
+          label="Calculations"
+          value={stats.calculations}
+          icon={Calculator}
+          trend={0}
+          animated
+          className="animate-fade-in-up"
+          style={{ animationDelay: '0.9s' } as React.CSSProperties}
+        />
+      </div>
+
       {/* Recent Activity Section */}
-      <div className="mt-8 relative z-10 animate-fade-in-up" style={{ animationDelay: '1s' }}>
+      <div className="mt-8 relative z-10 animate-fade-in-up" style={{ animationDelay: '1.0s' }}>
         <div className="flex items-center space-x-2 mb-4">
           <Clock className="w-5 h-5 text-purple-500 animate-pulse" />
           <h2 className="text-2xl font-semibold">
@@ -163,13 +189,10 @@ export default function DashboardPage() {
         </div>
         
         <GlassCard className="p-6">
-          <div className="text-center py-12">
-            <div className="inline-flex p-4 bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl mb-4">
-              <Clock className="w-12 h-12 text-gray-400" />
-            </div>
-            <p className="text-gray-500 text-lg">No recent activity to display</p>
-            <p className="text-gray-400 text-sm mt-2">Your activity will appear here once you start using the calculator</p>
-          </div>
+          <ActivityTimeline 
+            userRole={user.role as 'admin' | 'manager' | 'user'} 
+            currentUserId={user.id} 
+          />
         </GlassCard>
       </div>
     </div>

@@ -18,6 +18,7 @@ export const useCalculatorStore = create<CalculatorState>()(
       sections: [],
       dealDetails: DEFAULT_DEAL_DETAILS,
       originalUserContext: null as { role: string; username: string } | null,
+      currentDealId: null,
 
       initializeStore: async () => {
         const configStore = useConfigStore.getState();
@@ -85,7 +86,7 @@ export const useCalculatorStore = create<CalculatorState>()(
 
       saveDeal: async () => {
         try {
-          const { sections, dealDetails } = get();
+          const { sections, dealDetails, currentDealId } = get();
           const configStore = useConfigStore.getState();
           const { useAuthStore } = await import('@/store/auth');
           const { user } = useAuthStore.getState();
@@ -95,9 +96,59 @@ export const useCalculatorStore = create<CalculatorState>()(
           }
 
           const totals = get().calculateTotalCosts();
+          const existingDeals = JSON.parse(localStorage.getItem('deals-storage') || '[]');
+
+          // Check if we're updating an existing deal
+          if (currentDealId) {
+            const dealIndex = existingDeals.findIndex((d: any) => d.id === currentDealId);
+            
+            if (dealIndex !== -1) {
+              // UPDATE existing deal
+              const existingDeal = existingDeals[dealIndex];
+              const updatedDeal = {
+                ...existingDeal,
+                userId: user.id,
+                username: user.username,
+                userRole: user.role,
+                customerName: dealDetails.customerName,
+                term: dealDetails.term,
+                escalation: dealDetails.escalation,
+                distanceToInstall: dealDetails.distanceToInstall,
+                settlement: dealDetails.settlement,
+                sections,
+                factors: configStore.factors,
+                scales: configStore.scales,
+                totals,
+                updatedAt: new Date().toISOString()
+                // Keep original createdAt and id
+              };
+              
+              existingDeals[dealIndex] = updatedDeal;
+              localStorage.setItem('deals-storage', JSON.stringify(existingDeals));
+              
+              // Log activity: deal_saved
+              try {
+                const { logActivity } = await import('@/lib/activityLogger');
+                logActivity({
+                  userId: user.id,
+                  username: user.username,
+                  userRole: user.role,
+                  activityType: 'deal_saved',
+                  dealId: currentDealId,
+                  dealName: dealDetails.customerName
+                });
+              } catch (logError) {
+                console.warn('Failed to log deal_saved activity:', logError);
+              }
+              
+              return true;
+            }
+          }
           
-          const deal = {
-            id: `deal_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          // CREATE new deal
+          const newDealId = `deal_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+          const newDeal = {
+            id: newDealId,
             userId: user.id,
             username: user.username,
             userRole: user.role,
@@ -105,7 +156,6 @@ export const useCalculatorStore = create<CalculatorState>()(
             term: dealDetails.term,
             escalation: dealDetails.escalation,
             distanceToInstall: dealDetails.distanceToInstall,
-
             settlement: dealDetails.settlement,
             sections,
             factors: configStore.factors,
@@ -114,11 +164,27 @@ export const useCalculatorStore = create<CalculatorState>()(
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
           };
-
-          // Store deal in localStorage instead of API call
-          const existingDeals = JSON.parse(localStorage.getItem('deals-storage') || '[]');
-          existingDeals.push(deal);
+          
+          existingDeals.push(newDeal);
           localStorage.setItem('deals-storage', JSON.stringify(existingDeals));
+          
+          // Set current deal ID after creating new deal
+          set({ currentDealId: newDealId });
+
+          // Log activity: deal_created
+          try {
+            const { logActivity } = await import('@/lib/activityLogger');
+            logActivity({
+              userId: user.id,
+              username: user.username,
+              userRole: user.role,
+              activityType: 'deal_created',
+              dealId: newDealId,
+              dealName: dealDetails.customerName
+            });
+          } catch (logError) {
+            console.warn('Failed to log deal_created activity:', logError);
+          }
 
           return true;
         } catch (error) {
@@ -149,8 +215,29 @@ export const useCalculatorStore = create<CalculatorState>()(
             originalUserContext: {
               role: deal.userRole,
               username: deal.username
-            }
+            },
+            currentDealId: dealId
           }));
+
+          // Log activity: deal_loaded
+          try {
+            const { useAuthStore } = await import('@/store/auth');
+            const { user } = useAuthStore.getState();
+            
+            if (user) {
+              const { logActivity } = await import('@/lib/activityLogger');
+              logActivity({
+                userId: user.id,
+                username: user.username,
+                userRole: user.role,
+                activityType: 'deal_loaded',
+                dealId: dealId,
+                dealName: deal.customerName
+              });
+            }
+          } catch (logError) {
+            console.warn('Failed to log deal_loaded activity:', logError);
+          }
 
           return deal;
         } catch (error) {
@@ -163,6 +250,7 @@ export const useCalculatorStore = create<CalculatorState>()(
         set((state) => ({
           dealDetails: DEFAULT_DEAL_DETAILS,
           originalUserContext: null,
+          currentDealId: null,
           // Clear temporary items from all sections when starting a new deal
           // This ensures temporary items from previous calculations don't carry over
           // Addresses Requirement 3.6: Clear all temporary items when starting new deal calculation

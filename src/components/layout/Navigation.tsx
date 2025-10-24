@@ -12,7 +12,8 @@ import {
   X,
   Home,
   FileText,
-  BookOpen
+  BookOpen,
+  Search
 } from 'lucide-react';
 
 export default function Navigation() {
@@ -31,6 +32,9 @@ export default function Navigation() {
     { name: 'Calculator', href: '/calculator', icon: Calculator },
     { name: 'My Deals', href: '/my-deals', icon: FileText },
     { name: 'Documentation', href: '/documentation', icon: BookOpen },
+    ...(user?.role === 'admin' || user?.role === 'manager' ? [
+      { name: 'Smart Scraper', href: '/scraper', icon: Search },
+    ] : []),
     ...(user?.role === 'admin' ? [
       { name: 'Admin', href: '/admin', icon: Settings },
     ] : []),
@@ -59,16 +63,16 @@ export default function Navigation() {
                 <Link
                   key={item.name}
                   href={item.href}
-                  className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-all duration-300 relative group transform hover:scale-105 ${
+                  className={`flex items-center space-x-2 px-3 py-2 rounded-lg font-medium transition-all duration-300 relative group transform hover:scale-105 whitespace-nowrap ${
                     active
                       ? 'bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-700 shadow-lg border border-blue-200 scale-105'
                       : 'text-gray-600 hover:text-blue-600 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 hover:shadow-md'
                   }`}
                 >
-                  <Icon className={`w-4 h-4 transition-all duration-200 ${
+                  <Icon className={`w-4 h-4 flex-shrink-0 transition-all duration-200 ${
                     active ? 'scale-110 text-blue-600' : 'group-hover:scale-110 group-hover:rotate-3'
                   }`} />
-                  <span className="relative">
+                  <span className="relative text-sm">
                     {item.name}
                     {active && (
                       <div className="absolute -bottom-1 left-0 right-0 h-0.5 bg-blue-600 rounded-full"></div>

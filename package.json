@@ -11,14 +11,20 @@
     "deploy": "npm run build && echo 'Build successful! Ready for Vercel deployment.'"
   },
   "dependencies": {
+    "@sparticuz/chromium": "^141.0.0",
     "@supabase/supabase-js": "^2.53.0",
     "clsx": "^2.1.1",
     "lucide-react": "^0.536.0",
     "next": "15.4.5",
     "pdf-lib": "^1.17.1",
+    "puppeteer": "^24.26.1",
+    "puppeteer-core": "^24.26.1",
     "react": "19.1.0",
     "react-dom": "19.1.0",
+    "react-window": "^2.2.1",
     "tailwind-merge": "^3.3.1",
+    "uuid": "^13.0.0",
+    "xlsx": "^0.18.5",
     "zustand": "^5.0.7"
   },
   "devDependencies": {
@@ -27,6 +33,8 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/react-window": "^1.8.8",
+    "@types/uuid": "^10.0.0",
     "autoprefixer": "^10.4.21",
     "eslint": "^9",
     "eslint-config-next": "15.4.5",

@@ -105,9 +105,17 @@ const ProposalGenerator = forwardRef<ProposalGeneratorRef, ProposalGeneratorProp
 
         // Get hardware items (only locked items that are selected by user)
         const hardwareSection = sections.find(s => s.id === 'hardware');
-        const hardwareItems = hardwareSection?.items.filter(item => 
-          item.locked && item.quantity > 0
-        ).slice(0, 9) || [];
+        const hardwareItems = hardwareSection?.items.filter(item => {
+          if (item.quantity === 0) return false;
+          
+          // For temporary items, check showOnProposal
+          if (item.isTemporary) {
+            return item.showOnProposal === true;
+          }
+          
+          // For permanent items, check locked (existing behavior)
+          return item.locked === true;
+        }).slice(0, 9) || [];
 
         // Get connectivity and licensing items
         const connectivitySection = sections.find(s => s.id === 'connectivity');
@@ -229,6 +237,27 @@ const ProposalGenerator = forwardRef<ProposalGeneratorRef, ProposalGeneratorProp
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
+
+        // Log activity: proposal_generated
+        try {
+          const { logActivity } = await import('@/lib/activityLogger');
+          const { useAuthStore } = await import('@/store/auth');
+          const { user } = useAuthStore.getState();
+          const { currentDealId } = useCalculatorStore.getState();
+          
+          if (user) {
+            logActivity({
+              userId: user.id,
+              username: user.username,
+              userRole: user.role,
+              activityType: 'proposal_generated',
+              dealId: currentDealId || undefined,
+              dealName: proposalData.customerName
+            });
+          }
+        } catch (logError) {
+          console.warn('Failed to log proposal_generated activity:', logError);
+        }
 
         setToast({
           show: true,

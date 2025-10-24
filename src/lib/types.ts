@@ -148,6 +148,7 @@ export interface CalculatorState {
   sections: Section[];
   dealDetails: DealDetails;
   originalUserContext: { role: string; username: string } | null;
+  currentDealId: string | null;
   initializeStore: () => Promise<void>;
   updateSectionItem: (sectionId: string, itemId: string, updates: Partial<Item>) => void;
   addTemporaryItem: (sectionId: string, item: Item) => void;
