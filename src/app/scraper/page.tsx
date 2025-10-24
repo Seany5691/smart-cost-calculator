@@ -24,12 +24,6 @@ import { useAutoExport } from '@/hooks/useAutoExport';
 function ScraperPageContent() {
   const router = useRouter();
   const { user, checkAuth } = useAuthStore();
-  const [isVercel, setIsVercel] = useState(false);
-
-  // Check if running on Vercel
-  useEffect(() => {
-    setIsVercel(window.location.hostname.includes('vercel.app') || process.env.NEXT_PUBLIC_VERCEL_ENV !== undefined);
-  }, []);
 
   // Role-based access control
   useEffect(() => {
@@ -367,32 +361,7 @@ function ScraperPageContent() {
           </p>
         </div>
 
-        {/* Vercel Warning Banner */}
-        {isVercel && (
-          <div className="bg-gradient-to-r from-yellow-50 to-orange-50 border-2 border-yellow-400 rounded-lg p-4 shadow-lg">
-            <div className="flex items-start gap-3">
-              <div className="flex-shrink-0">
-                <svg className="w-6 h-6 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-              </div>
-              <div className="flex-1">
-                <h3 className="text-lg font-bold text-yellow-900 mb-1">
-                  Scraper Not Available on Vercel
-                </h3>
-                <p className="text-sm text-yellow-800 mb-2">
-                  The Smart Scraper requires a long-running server environment and cannot function on Vercel's serverless platform. 
-                  The scraping functionality will not work in this deployment.
-                </p>
-                <p className="text-sm text-yellow-800 font-medium">
-                  ✅ Lookup tools (Number Lookup & Business Lookup) will work<br />
-                  ❌ Town/Industry scraping will not work<br />
-                  💡 For full scraper functionality, deploy to a VPS or run locally
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
+
 
         {/* Lookup Tools - Side by Side */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -457,41 +426,21 @@ function ScraperPageContent() {
 
           {/* Row 2: Controls & Concurrency */}
           <div className="glass-card p-6 h-full">
-            {isVercel ? (
-              <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-gradient-to-br from-gray-400 to-gray-500 rounded-lg shadow-lg opacity-50">
-                    <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-gray-500">Controls</h3>
-                    <p className="text-xs text-gray-400">Disabled on Vercel</p>
-                  </div>
-                </div>
-                <div className="text-center py-8 text-gray-400">
-                  <p className="text-sm">Scraping controls are disabled on serverless platforms.</p>
-                  <p className="text-xs mt-2">Deploy to a VPS or run locally for full functionality.</p>
-                </div>
-              </div>
-            ) : (
-              <ControlPanel
-                status={status}
-                onStart={handleStart}
-                onStop={handleStop}
-                onPause={handlePause}
-                onResume={handleResume}
-                onSave={handleSave}
-                onLoad={handleLoad}
-                onClear={handleClear}
-                onExport={handleExport}
-                hasData={hasData}
-                isSaving={isSaving}
-                isLoading={isLoading}
-                isExporting={isExporting}
-              />
-            )}
+            <ControlPanel
+              status={status}
+              onStart={handleStart}
+              onStop={handleStop}
+              onPause={handlePause}
+              onResume={handleResume}
+              onSave={handleSave}
+              onLoad={handleLoad}
+              onClear={handleClear}
+              onExport={handleExport}
+              hasData={hasData}
+              isSaving={isSaving}
+              isLoading={isLoading}
+              isExporting={isExporting}
+            />
           </div>
 
           <div className="glass-card p-6 h-full">
