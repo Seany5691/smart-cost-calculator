@@ -8,9 +8,11 @@ import {
   FileDown, 
   Clock,
   User,
-  ChevronDown
+  ChevronDown,
+  Loader2
 } from 'lucide-react';
 import { getActivityLogs, getUniqueUsers, ActivityLog, ActivityType } from '@/lib/activityLogger';
+import { supabaseHelpers } from '@/lib/supabase';
 import { useAuthStore } from '@/store/auth';
 
 interface ActivityTimelineProps {
@@ -74,26 +76,55 @@ export default function ActivityTimeline({ userRole, currentUserId }: ActivityTi
   const [activities, setActivities] = useState<ActivityLog[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string>('all');
   const [availableUsers, setAvailableUsers] = useState<Array<{ userId: string; username: string; userRole: string }>>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const { users } = useAuthStore();
 
   useEffect(() => {
     // Load activities based on role and selected user
-    let logs: ActivityLog[];
-    
-    if (userRole === 'admin') {
-      if (selectedUserId === 'all') {
-        // Admin viewing all users
-        logs = getActivityLogs();
-      } else {
-        // Admin viewing specific user
-        logs = getActivityLogs(selectedUserId);
+    const loadActivities = async () => {
+      setIsLoading(true);
+      setError(null);
+      
+      try {
+        let logs: ActivityLog[];
+        
+        if (userRole === 'admin') {
+          if (selectedUserId === 'all') {
+            // Admin viewing all users - fetch from Supabase
+            logs = await supabaseHelpers.getActivityLogs();
+          } else {
+            // Admin viewing specific user - fetch from Supabase with filter
+            logs = await supabaseHelpers.getActivityLogs(selectedUserId);
+          }
+        } else {
+          // Non-admin users only see their own activities - fetch from Supabase
+          logs = await supabaseHelpers.getActivityLogs(currentUserId);
+        }
+        
+        setActivities(logs);
+      } catch (err) {
+        console.error('Failed to load activities from Supabase, falling back to localStorage:', err);
+        setError('Unable to load activities from server. Showing local data.');
+        
+        // Fall back to localStorage
+        let logs: ActivityLog[];
+        if (userRole === 'admin') {
+          if (selectedUserId === 'all') {
+            logs = getActivityLogs();
+          } else {
+            logs = getActivityLogs(selectedUserId);
+          }
+        } else {
+          logs = getActivityLogs(currentUserId);
+        }
+        setActivities(logs);
+      } finally {
+        setIsLoading(false);
       }
-    } else {
-      // Non-admin users only see their own activities
-      logs = getActivityLogs(currentUserId);
-    }
-    
-    setActivities(logs);
+    };
+
+    loadActivities();
   }, [userRole, currentUserId, selectedUserId]);
 
   useEffect(() => {
@@ -115,6 +146,7 @@ export default function ActivityTimeline({ userRole, currentUserId }: ActivityTi
               value={selectedUserId}
               onChange={(e) => setSelectedUserId(e.target.value)}
               className="w-full px-4 py-2 pr-10 bg-white/80 border border-gray-200 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent appearance-none cursor-pointer transition-all duration-200 hover:bg-white"
+              disabled={isLoading}
             >
               <option value="all">All Users</option>
               {availableUsers.map((user) => (
@@ -128,8 +160,24 @@ export default function ActivityTimeline({ userRole, currentUserId }: ActivityTi
         </div>
       )}
 
-      {/* Activity List */}
-      {activities.length === 0 ? (
+      {/* Error Message */}
+      {error && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-start space-x-2">
+          <div className="text-yellow-600 text-sm flex-1">
+            {error}
+          </div>
+        </div>
+      )}
+
+      {/* Loading State */}
+      {isLoading ? (
+        <div className="text-center py-12">
+          <div className="inline-flex p-4 bg-gradient-to-br from-blue-100 to-purple-100 rounded-2xl mb-4">
+            <Loader2 className="w-12 h-12 text-blue-500 animate-spin" />
+          </div>
+          <p className="text-gray-500 text-lg">Loading activities...</p>
+        </div>
+      ) : activities.length === 0 ? (
         <div className="text-center py-12">
           <div className="inline-flex p-4 bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl mb-4">
             <Clock className="w-12 h-12 text-gray-400" />

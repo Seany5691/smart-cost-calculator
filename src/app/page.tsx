@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { Calculator, Settings, FileText, Users, ArrowRight, Clock, FolderOpen, Sparkles, TrendingUp, Search } from 'lucide-react';
 import { AnimatedBackground, GlassCard, GradientText, StatCard } from '@/components/ui/modern';
 import ActivityTimeline from '@/components/dashboard/ActivityTimeline';
-import { getTotalDeals, getActiveProjects, getTotalCalculations } from '@/lib/dashboardStats';
+import { getTotalDealsAsync, getActiveProjectsAsync, getTotalCalculationsAsync } from '@/lib/dashboardStats';
 
 export default function DashboardPage() {
   const { user, checkAuth } = useAuthStore();
@@ -17,6 +17,7 @@ export default function DashboardPage() {
     activeProjects: 0,
     calculations: 0
   });
+  const [isLoadingStats, setIsLoadingStats] = useState(true);
 
   useEffect(() => {
     if (!checkAuth()) {
@@ -25,14 +26,31 @@ export default function DashboardPage() {
   }, [checkAuth, router]);
 
   useEffect(() => {
-    if (user) {
-      const isAdmin = user.role === 'admin';
-      setStats({
-        totalDeals: getTotalDeals(user.id, isAdmin),
-        activeProjects: getActiveProjects(user.id, isAdmin),
-        calculations: getTotalCalculations(user.id, isAdmin)
-      });
-    }
+    const loadStats = async () => {
+      if (user) {
+        setIsLoadingStats(true);
+        try {
+          const isAdmin = user.role === 'admin';
+          const [totalDeals, activeProjects, calculations] = await Promise.all([
+            getTotalDealsAsync(user.id, isAdmin),
+            getActiveProjectsAsync(user.id, isAdmin),
+            getTotalCalculationsAsync(user.id, isAdmin)
+          ]);
+          
+          setStats({
+            totalDeals,
+            activeProjects,
+            calculations
+          });
+        } catch (error) {
+          console.error('Failed to load dashboard statistics:', error);
+        } finally {
+          setIsLoadingStats(false);
+        }
+      }
+    };
+
+    loadStats();
   }, [user]);
 
   if (!user) {

@@ -795,6 +795,182 @@ CREATE POLICY "Users can delete own deals" ON deal_calculations
 3. Document rollback procedure
 4. Have database backup ready
 
+### 7. Scraper Industries Integration
+
+**File**: `src/app/scraper/page.tsx`
+
+**Changes**:
+```typescript
+// Add Supabase helper functions
+const loadIndustries = async () => {
+  try {
+    const { data, error } = await supabase
+      .from('scraper_industries')
+      .select('*')
+      .eq('isActive', true)
+      .order('name');
+
+    if (error) throw error;
+    return data.map(i => i.name);
+  } catch (error) {
+    console.warn('Failed to load industries from Supabase, using localStorage:', error);
+    const stored = localStorage.getItem('smart-scrape-industries');
+    return stored ? JSON.parse(stored) : [];
+  }
+};
+
+const saveIndustry = async (industryName: string) => {
+  try {
+    const { error } = await supabase
+      .from('scraper_industries')
+      .insert({ name: industryName });
+
+    if (error) throw error;
+  } catch (error) {
+    console.warn('Failed to save industry to Supabase, using localStorage:', error);
+    // Fall back to localStorage
+    const stored = localStorage.getItem('smart-scrape-industries');
+    const industries = stored ? JSON.parse(stored) : [];
+    industries.push(industryName);
+    localStorage.setItem('smart-scrape-industries', JSON.stringify(industries));
+  }
+};
+
+const deleteIndustry = async (industryName: string) => {
+  try {
+    const { error } = await supabase
+      .from('scraper_industries')
+      .delete()
+      .eq('name', industryName);
+
+    if (error) throw error;
+  } catch (error) {
+    console.warn('Failed to delete industry from Supabase:', error);
+  }
+};
+
+// Migration function
+const migrateIndustriesToSupabase = async () => {
+  try {
+    const stored = localStorage.getItem('smart-scrape-industries');
+    if (!stored) return true;
+
+    const migrationKey = 'industries-migrated';
+    if (localStorage.getItem(migrationKey) === 'true') return true;
+
+    const industries = JSON.parse(stored);
+    const industriesToInsert = industries.map((name: string) => ({ name }));
+
+    const { error } = await supabase
+      .from('scraper_industries')
+      .upsert(industriesToInsert, { onConflict: 'name' });
+
+    if (error) throw error;
+
+    localStorage.setItem(migrationKey, 'true');
+    return true;
+  } catch (error) {
+    console.error('Failed to migrate industries:', error);
+    return false;
+  }
+};
+```
+
+### 8. Scraper Saved Sessions Integration
+
+**File**: `src/app/scraper/page.tsx`
+
+**Changes**:
+```typescript
+// Add Supabase helper functions
+const loadSavedSessions = async (userId: string) => {
+  try {
+    const { data, error } = await supabase
+      .from('scraper_saved_sessions')
+      .select('*')
+      .eq('userId', userId)
+      .order('createdAt', { ascending: false });
+
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.warn('Failed to load saved sessions from Supabase, using localStorage:', error);
+    const stored = localStorage.getItem('smart-scrape-sessions');
+    return stored ? JSON.parse(stored) : [];
+  }
+};
+
+const saveScraper Session = async (userId: string, sessionData: any) => {
+  try {
+    const { error } = await supabase
+      .from('scraper_saved_sessions')
+      .insert({
+        userId,
+        sessionName: sessionData.name,
+        towns: sessionData.towns,
+        industries: sessionData.industries,
+        config: sessionData.config
+      });
+
+    if (error) throw error;
+    toast.success('Session Saved', 'Your scraper configuration has been saved.');
+  } catch (error) {
+    console.warn('Failed to save session to Supabase, using localStorage:', error);
+    // Fall back to localStorage
+    const stored = localStorage.getItem('smart-scrape-sessions');
+    const sessions = stored ? JSON.parse(stored) : [];
+    sessions.push(sessionData);
+    localStorage.setItem('smart-scrape-sessions', JSON.stringify(sessions));
+    toast.success('Session Saved Locally', 'Your configuration has been saved locally.');
+  }
+};
+
+const deleteSavedSession = async (sessionId: string) => {
+  try {
+    const { error } = await supabase
+      .from('scraper_saved_sessions')
+      .delete()
+      .eq('id', sessionId);
+
+    if (error) throw error;
+  } catch (error) {
+    console.warn('Failed to delete session from Supabase:', error);
+  }
+};
+
+// Migration function
+const migrateSavedSessionsToSupabase = async (userId: string) => {
+  try {
+    const stored = localStorage.getItem('smart-scrape-sessions');
+    if (!stored) return true;
+
+    const migrationKey = 'scraper-sessions-migrated';
+    if (localStorage.getItem(migrationKey) === 'true') return true;
+
+    const sessions = JSON.parse(stored);
+    const sessionsToInsert = sessions.map((session: any) => ({
+      userId,
+      sessionName: session.name,
+      towns: session.towns,
+      industries: session.industries,
+      config: session.config || {}
+    }));
+
+    const { error } = await supabase
+      .from('scraper_saved_sessions')
+      .insert(sessionsToInsert);
+
+    if (error) throw error;
+
+    localStorage.setItem(migrationKey, 'true');
+    return true;
+  } catch (error) {
+    console.error('Failed to migrate saved sessions:', error);
+    return false;
+  }
+};
+```
+
 ## Future Enhancements
 
 ### Potential Improvements (Out of Scope)

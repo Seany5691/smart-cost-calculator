@@ -94,7 +94,36 @@ This specification covers the migration of user activity logs and saved deals fr
 6. WHEN data is updated THEN the system SHALL invalidate the cache and refresh the data
 7. IF the user is offline THEN the system SHALL use cached data and display a notification
 
-### Requirement 7: Testing and Validation
+### Requirement 7: Scraper Industries Supabase Integration
+
+**User Story:** As a user, I want my custom scraper industries to be stored in Supabase instead of localStorage, so that I can access my industry list from any device or browser.
+
+#### Acceptance Criteria
+
+1. WHEN a user adds a custom industry THEN the system SHALL save the industry to the Supabase `scraper_industries` table
+2. WHEN a user views the scraper page THEN the system SHALL retrieve industries from Supabase instead of localStorage
+3. WHEN a user deletes a custom industry THEN the system SHALL remove the industry from Supabase
+4. IF the Supabase save operation fails THEN the system SHALL fall back to localStorage and display a warning message
+5. WHEN the system initializes THEN the system SHALL migrate any existing localStorage industries to Supabase as a one-time operation
+6. IF a user has industries in both localStorage and Supabase THEN the system SHALL merge them and remove duplicates based on industry name
+7. WHEN industries are stored in Supabase THEN the system SHALL maintain the same data structure as the current localStorage implementation
+
+### Requirement 8: Scraper Saved Sessions Supabase Integration
+
+**User Story:** As a user, I want my saved scraper sessions to be stored in Supabase instead of localStorage, so that I can access my saved configurations from any device or browser.
+
+#### Acceptance Criteria
+
+1. WHEN a user saves a scraper session configuration THEN the system SHALL save the session to the Supabase `scraper_saved_sessions` table
+2. WHEN a user views saved sessions THEN the system SHALL retrieve sessions from Supabase instead of localStorage
+3. WHEN a user loads a saved session THEN the system SHALL retrieve the session configuration from Supabase
+4. WHEN a user deletes a saved session THEN the system SHALL remove the session from Supabase
+5. IF the Supabase save operation fails THEN the system SHALL fall back to localStorage and display an error message
+6. WHEN the system initializes THEN the system SHALL migrate any existing localStorage saved sessions to Supabase as a one-time operation
+7. IF a user has saved sessions in both localStorage and Supabase THEN the system SHALL merge them and remove duplicates based on session name
+8. WHEN saved sessions are stored in Supabase THEN the system SHALL maintain the same data structure as the current localStorage implementation
+
+### Requirement 9: Testing and Validation
 
 **User Story:** As a developer, I want comprehensive testing to ensure the Supabase integration works correctly, so that users don't experience data loss or corruption.
 
@@ -103,7 +132,9 @@ This specification covers the migration of user activity logs and saved deals fr
 1. WHEN testing the migration THEN the system SHALL verify all localStorage data is correctly transferred to Supabase
 2. WHEN testing activity logging THEN the system SHALL verify all activity types are correctly saved to Supabase
 3. WHEN testing deal operations THEN the system SHALL verify create, read, update, and delete operations work correctly
-4. WHEN testing error handling THEN the system SHALL verify fallback to localStorage works when Supabase is unavailable
-5. WHEN testing concurrent access THEN the system SHALL verify no data loss occurs when multiple devices access the same account
-6. WHEN testing role-based access THEN the system SHALL verify users can only access their own data and admins can access all data
-7. WHEN testing performance THEN the system SHALL verify query response times are acceptable (< 1 second for typical operations)
+4. WHEN testing scraper industries THEN the system SHALL verify add, retrieve, and delete operations work correctly
+5. WHEN testing scraper saved sessions THEN the system SHALL verify save, load, and delete operations work correctly
+6. WHEN testing error handling THEN the system SHALL verify fallback to localStorage works when Supabase is unavailable
+7. WHEN testing concurrent access THEN the system SHALL verify no data loss occurs when multiple devices access the same account
+8. WHEN testing role-based access THEN the system SHALL verify users can only access their own data and admins can access all data
+9. WHEN testing performance THEN the system SHALL verify query response times are acceptable (< 1 second for typical operations)

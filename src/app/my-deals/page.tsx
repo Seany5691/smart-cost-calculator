@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth';
+import { supabaseHelpers } from '@/lib/supabase';
 import { Calculator, Calendar, User, DollarSign, ArrowRight, FileText, Trash2, Download } from 'lucide-react';
 import Link from 'next/link';
 import { Button, Card, CardContent, Input, Label } from '@/components/ui';
@@ -40,15 +41,51 @@ export default function MyDealsPage() {
 
   const loadMyDeals = useCallback(async () => {
     try {
-      // Load deals from localStorage
-      const dealsStorage = localStorage.getItem('deals-storage');
-      let allDeals: Deal[] = [];
+      setIsLoading(true);
       
-      if (dealsStorage) {
-        try {
+      if (!user?.id) {
+        setDeals([]);
+        setFilteredDeals([]);
+        return;
+      }
+
+      // Fetch deals from Supabase
+      const supabaseDeals = await supabaseHelpers.getDeals(user.id, false);
+      
+      // Transform Supabase data to match Deal interface
+      const allDeals: Deal[] = supabaseDeals.map((deal: any) => ({
+        id: deal.id || '',
+        userId: deal.userId || '',
+        username: deal.username || 'Unknown User',
+        userRole: deal.userRole || 'user',
+        customerName: deal.customerName || deal.dealName || 'Unknown Customer',
+        term: Number(deal.dealDetails?.term) || 0,
+        escalation: Number(deal.dealDetails?.escalation) || 0,
+        distanceToInstall: Number(deal.dealDetails?.distanceToInstall) || 0,
+        settlement: Number(deal.dealDetails?.settlement) || 0,
+        sections: Array.isArray(deal.sectionsData) ? deal.sectionsData : [],
+        factors: deal.factorsData || {},
+        scales: deal.scalesData || {},
+        totals: {
+          totalPayout: Number(deal.totalsData?.totalPayout) || 0,
+          extensionCount: Number(deal.totalsData?.extensionCount) || 0,
+          ...deal.totalsData
+        },
+        createdAt: deal.createdAt || new Date().toISOString(),
+        updatedAt: deal.updatedAt || new Date().toISOString()
+      }));
+      
+      setDeals(allDeals);
+      setFilteredDeals(allDeals);
+    } catch (error) {
+      console.error('Error loading deals from Supabase:', error);
+      
+      // Fallback to localStorage on error
+      try {
+        const dealsStorage = localStorage.getItem('deals-storage');
+        if (dealsStorage) {
           const parsedDeals = JSON.parse(dealsStorage);
-          // Filter deals to only show current user's deals
-          allDeals = Array.isArray(parsedDeals) ? parsedDeals
+          const localDeals = Array.isArray(parsedDeals) ? parsedDeals
             .filter((deal: any) => deal.userId === user?.id)
             .map((deal: any) => ({
               id: deal.id || '',
@@ -71,16 +108,13 @@ export default function MyDealsPage() {
               createdAt: deal.createdAt || new Date().toISOString(),
               updatedAt: deal.updatedAt || new Date().toISOString()
             })) : [];
-        } catch (parseError) {
-          console.error('Error parsing deals storage:', parseError);
-          allDeals = [];
+          
+          setDeals(localDeals);
+          setFilteredDeals(localDeals);
         }
+      } catch (fallbackError) {
+        console.error('Error loading deals from localStorage:', fallbackError);
       }
-      
-      setDeals(allDeals);
-      setFilteredDeals(allDeals);
-    } catch (error) {
-      console.error('Error loading deals:', error);
     } finally {
       setIsLoading(false);
     }
@@ -89,29 +123,41 @@ export default function MyDealsPage() {
   const deleteMyDeal = useCallback(async (dealId: string) => {
     setIsDeleting(dealId);
     try {
-      // Load current deals
-      const dealsStorage = localStorage.getItem('deals-storage');
-      let allDeals: any[] = [];
-      
-      if (dealsStorage) {
-        allDeals = JSON.parse(dealsStorage);
-      }
-      
-      // Remove the deal with the specified ID (only if it belongs to current user)
-      const updatedDeals = allDeals.filter((deal: any) => 
-        !(deal.id === dealId && deal.userId === user?.id)
-      );
-      
-      // Save back to localStorage
-      localStorage.setItem('deals-storage', JSON.stringify(updatedDeals));
+      // Delete from Supabase
+      await supabaseHelpers.deleteDeal(dealId);
       
       // Reload deals to update the UI
       await loadMyDeals();
       
       return true;
     } catch (error) {
-      console.error('Error deleting deal:', error);
-      return false;
+      console.error('Error deleting deal from Supabase:', error);
+      
+      // Fallback to localStorage on error
+      try {
+        const dealsStorage = localStorage.getItem('deals-storage');
+        let allDeals: any[] = [];
+        
+        if (dealsStorage) {
+          allDeals = JSON.parse(dealsStorage);
+        }
+        
+        // Remove the deal with the specified ID (only if it belongs to current user)
+        const updatedDeals = allDeals.filter((deal: any) => 
+          !(deal.id === dealId && deal.userId === user?.id)
+        );
+        
+        // Save back to localStorage
+        localStorage.setItem('deals-storage', JSON.stringify(updatedDeals));
+        
+        // Reload deals to update the UI
+        await loadMyDeals();
+        
+        return true;
+      } catch (fallbackError) {
+        console.error('Error deleting deal from localStorage:', fallbackError);
+        return false;
+      }
     } finally {
       setIsDeleting(null);
     }

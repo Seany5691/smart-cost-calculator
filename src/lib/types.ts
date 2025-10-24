@@ -147,7 +147,7 @@ export interface AuthState {
 export interface CalculatorState {
   sections: Section[];
   dealDetails: DealDetails;
-  originalUserContext: { role: string; username: string } | null;
+  originalUserContext: { role: string; username: string; userId?: string } | null;
   currentDealId: string | null;
   initializeStore: () => Promise<void>;
   updateSectionItem: (sectionId: string, itemId: string, updates: Partial<Item>) => void;
@@ -158,6 +158,7 @@ export interface CalculatorState {
   resetDeal: () => void;
   clearTemporaryItems: () => void;
   calculateTotalCosts: () => TotalCosts;
+  migrateDealsToSupabase: () => Promise<boolean>;
 }
 
 export interface OfflineState {

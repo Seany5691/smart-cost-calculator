@@ -198,26 +198,89 @@ export const supabaseHelpers = {
   },
 
   // Deal calculations
-  async saveDeal(deal: any) {
-    const { data, error } = await supabase
-      .from('deal_calculations')
-      .insert(deal)
-      .select()
-      .single();
+  async getDeals(userId?: string, isAdmin: boolean = false) {
+    try {
+      let query = supabase
+        .from('deal_calculations')
+        .select('*')
+        .order('createdAt', { ascending: false });
 
-    if (error) throw error;
-    return data;
+      // Non-admin users can only see their own deals
+      if (!isAdmin && userId) {
+        query = query.eq('userId', userId);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.warn('Failed to retrieve deals from Supabase:', error);
+      throw error;
+    }
   },
 
-  async getUserDeals(userId: string) {
-    const { data, error } = await supabase
-      .from('deal_calculations')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
+  async getDealById(dealId: string) {
+    try {
+      const { data, error } = await supabase
+        .from('deal_calculations')
+        .select('*')
+        .eq('id', dealId)
+        .single();
 
-    if (error) throw error;
-    return data;
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.warn('Failed to retrieve deal from Supabase:', error);
+      throw error;
+    }
+  },
+
+  async createDeal(deal: any) {
+    try {
+      const { data, error } = await supabase
+        .from('deal_calculations')
+        .insert(deal)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.warn('Failed to create deal in Supabase:', error);
+      throw error;
+    }
+  },
+
+  async updateDeal(dealId: string, updates: any) {
+    try {
+      const { data, error } = await supabase
+        .from('deal_calculations')
+        .update(updates)
+        .eq('id', dealId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.warn('Failed to update deal in Supabase:', error);
+      throw error;
+    }
+  },
+
+  async deleteDeal(dealId: string) {
+    try {
+      const { error } = await supabase
+        .from('deal_calculations')
+        .delete()
+        .eq('id', dealId);
+
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      console.warn('Failed to delete deal from Supabase:', error);
+      throw error;
+    }
   },
 
   // Users
@@ -275,6 +338,44 @@ export const supabaseHelpers = {
 
     if (error) throw error;
     return true;
+  },
+
+  // Activity logs
+  async getActivityLogs(userId?: string, limit: number = 100) {
+    try {
+      let query = supabase
+        .from('activity_logs')
+        .select('*')
+        .order('timestamp', { ascending: false })
+        .limit(limit);
+
+      if (userId) {
+        query = query.eq('userId', userId);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.warn('Failed to retrieve activity logs from Supabase:', error);
+      throw error;
+    }
+  },
+
+  async createActivityLog(log: any) {
+    try {
+      const { data, error } = await supabase
+        .from('activity_logs')
+        .insert(log)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.warn('Failed to create activity log in Supabase:', error);
+      throw error;
+    }
   }
 };
 
@@ -282,6 +383,44 @@ export const supabaseHelpers = {
 export interface Database {
   public: {
     Tables: {
+      activity_logs: {
+        Row: {
+          id: string;
+          userId: string;
+          username: string;
+          userRole: 'admin' | 'manager' | 'user';
+          activityType: 'deal_created' | 'deal_saved' | 'proposal_generated' | 'pdf_generated' | 'deal_loaded';
+          dealId: string | null;
+          dealName: string | null;
+          timestamp: string;
+          metadata: any | null;
+          createdAt: string;
+        };
+        Insert: {
+          id?: string;
+          userId: string;
+          username: string;
+          userRole: 'admin' | 'manager' | 'user';
+          activityType: 'deal_created' | 'deal_saved' | 'proposal_generated' | 'pdf_generated' | 'deal_loaded';
+          dealId?: string | null;
+          dealName?: string | null;
+          timestamp?: string;
+          metadata?: any | null;
+          createdAt?: string;
+        };
+        Update: {
+          id?: string;
+          userId?: string;
+          username?: string;
+          userRole?: 'admin' | 'manager' | 'user';
+          activityType?: 'deal_created' | 'deal_saved' | 'proposal_generated' | 'pdf_generated' | 'deal_loaded';
+          dealId?: string | null;
+          dealName?: string | null;
+          timestamp?: string;
+          metadata?: any | null;
+          createdAt?: string;
+        };
+      };
       users: {
         Row: {
           id: string;

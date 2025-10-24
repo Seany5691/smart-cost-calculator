@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth';
+import { supabaseHelpers } from '@/lib/supabase';
 import { Calculator, Calendar, User, DollarSign, ArrowRight, Plus, FileText } from 'lucide-react';
 import Link from 'next/link';
 
@@ -37,32 +38,68 @@ export default function DealsPage() {
 
   const loadDeals = useCallback(async () => {
     try {
-      // Load deals from localStorage with better error handling
-      const dealsStorage = localStorage.getItem('deals-storage');
+      setIsLoading(true);
       
-      let allDeals = [];
-      if (dealsStorage) {
-        try {
-          allDeals = JSON.parse(dealsStorage);
-        } catch (parseError) {
-          console.error('Error parsing deals storage:', parseError);
-          allDeals = [];
-        }
+      if (!user?.id) {
+        setDeals([]);
+        return;
       }
+
+      // Determine if user is admin
+      const isAdmin = user.role === 'admin';
       
-      // Filter deals based on user role
-      let userDeals: Deal[] = [];
-      if (user?.role === 'admin') {
-        // Admin can see all deals
-        userDeals = allDeals;
-      } else {
-        // User/Manager can only see their own deals
-        userDeals = allDeals.filter((deal: Deal) => deal.userId === user?.id);
-      }
+      // Fetch deals from Supabase
+      const supabaseDeals = await supabaseHelpers.getDeals(user.id, isAdmin);
+      
+      // Transform Supabase data to match Deal interface
+      const userDeals: Deal[] = supabaseDeals.map((deal: any) => ({
+        id: deal.id || '',
+        userId: deal.userId || '',
+        username: deal.username || 'Unknown User',
+        userRole: deal.userRole || 'user',
+        customerName: deal.customerName || deal.dealName || 'Unknown Customer',
+        term: Number(deal.dealDetails?.term) || 0,
+        escalation: Number(deal.dealDetails?.escalation) || 0,
+        distanceToInstall: Number(deal.dealDetails?.distanceToInstall) || 0,
+        additionalGrossProfit: Number(deal.dealDetails?.additionalGrossProfit) || 0,
+        settlement: Number(deal.dealDetails?.settlement) || 0,
+        sections: Array.isArray(deal.sectionsData) ? deal.sectionsData : [],
+        factors: deal.factorsData || {},
+        scales: deal.scalesData || {},
+        totals: {
+          totalPayout: Number(deal.totalsData?.totalPayout) || 0,
+          extensionCount: Number(deal.totalsData?.extensionCount) || 0,
+          ...deal.totalsData
+        },
+        createdAt: deal.createdAt || new Date().toISOString(),
+        updatedAt: deal.updatedAt || new Date().toISOString()
+      }));
       
       setDeals(userDeals);
     } catch (error) {
-      console.error('Error loading deals:', error);
+      console.error('Error loading deals from Supabase:', error);
+      
+      // Fallback to localStorage on error
+      try {
+        const dealsStorage = localStorage.getItem('deals-storage');
+        
+        let allDeals = [];
+        if (dealsStorage) {
+          allDeals = JSON.parse(dealsStorage);
+        }
+        
+        // Filter deals based on user role
+        let userDeals: Deal[] = [];
+        if (user?.role === 'admin') {
+          userDeals = allDeals;
+        } else {
+          userDeals = allDeals.filter((deal: Deal) => deal.userId === user?.id);
+        }
+        
+        setDeals(userDeals);
+      } catch (fallbackError) {
+        console.error('Error loading deals from localStorage:', fallbackError);
+      }
     } finally {
       setIsLoading(false);
     }

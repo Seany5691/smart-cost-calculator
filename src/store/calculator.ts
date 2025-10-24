@@ -48,6 +48,12 @@ export const useCalculatorStore = create<CalculatorState>()(
         ];
         
         set({ sections });
+
+        // Run migration in the background without blocking initialization
+        // Handle errors gracefully to not block user
+        get().migrateDealsToSupabase().catch(error => {
+          console.warn('Deals migration failed, but continuing with normal operation:', error);
+        });
       },
 
       updateSectionItem: (sectionId: string, itemId: string, updates: Partial<Item>) => {
@@ -86,107 +92,151 @@ export const useCalculatorStore = create<CalculatorState>()(
 
       saveDeal: async () => {
         try {
-          const { sections, dealDetails, currentDealId } = get();
+          const { sections, dealDetails, currentDealId, originalUserContext } = get();
           const configStore = useConfigStore.getState();
           const { useAuthStore } = await import('@/store/auth');
           const { user } = useAuthStore.getState();
+          const { supabaseHelpers } = await import('@/lib/supabase');
+          const { logActivityToSupabase } = await import('@/lib/activityLogger');
+          const { generateDealId } = await import('@/lib/idGenerator');
           
           if (!user) {
             return false;
           }
 
           const totals = get().calculateTotalCosts();
-          const existingDeals = JSON.parse(localStorage.getItem('deals-storage') || '[]');
+          
+          // Generate new UUID for new deals, preserve existing ID for updates
+          const dealId = currentDealId || generateDealId();
+          
+          // Prepare deal data for Supabase
+          const dealData = {
+            id: dealId,
+            userId: originalUserContext?.userId || user.id,
+            username: originalUserContext?.username || user.username,
+            userRole: originalUserContext?.role || user.role,
+            customerName: dealDetails.customerName,
+            dealName: dealDetails.customerName,
+            dealDetails: {
+              customerName: dealDetails.customerName,
+              term: dealDetails.term,
+              escalation: dealDetails.escalation,
+              distanceToInstall: dealDetails.distanceToInstall,
+              settlement: dealDetails.settlement
+            },
+            sectionsData: sections,
+            totalsData: totals,
+            factorsData: configStore.factors,
+            scalesData: configStore.scales,
+            updatedAt: new Date().toISOString()
+          };
 
-          // Check if we're updating an existing deal
-          if (currentDealId) {
-            const dealIndex = existingDeals.findIndex((d: any) => d.id === currentDealId);
-            
-            if (dealIndex !== -1) {
-              // UPDATE existing deal
-              const existingDeal = existingDeals[dealIndex];
-              const updatedDeal = {
-                ...existingDeal,
+          try {
+            if (currentDealId) {
+              // UPDATE existing deal in Supabase
+              // Preserve original deal ID (text or UUID) and only update updatedAt
+              await supabaseHelpers.updateDeal(currentDealId, dealData);
+
+              // Log activity: deal_saved
+              await logActivityToSupabase({
                 userId: user.id,
                 username: user.username,
                 userRole: user.role,
-                customerName: dealDetails.customerName,
-                term: dealDetails.term,
-                escalation: dealDetails.escalation,
-                distanceToInstall: dealDetails.distanceToInstall,
-                settlement: dealDetails.settlement,
-                sections,
-                factors: configStore.factors,
-                scales: configStore.scales,
-                totals,
-                updatedAt: new Date().toISOString()
-                // Keep original createdAt and id
+                activityType: 'deal_saved',
+                dealId: currentDealId,
+                dealName: dealDetails.customerName
+              });
+            } else {
+              // CREATE new deal in Supabase
+              // Use new UUID format for deal.id and set createdAt timestamp
+              const newDealData = {
+                ...dealData,
+                createdAt: new Date().toISOString()
               };
               
-              existingDeals[dealIndex] = updatedDeal;
-              localStorage.setItem('deals-storage', JSON.stringify(existingDeals));
+              await supabaseHelpers.createDeal(newDealData);
               
-              // Log activity: deal_saved
-              try {
-                const { logActivity } = await import('@/lib/activityLogger');
-                logActivity({
+              // Set current deal ID after creating new deal
+              set({ currentDealId: dealId });
+
+              // Log activity: deal_created
+              await logActivityToSupabase({
+                userId: user.id,
+                username: user.username,
+                userRole: user.role,
+                activityType: 'deal_created',
+                dealId: dealId,
+                dealName: dealDetails.customerName
+              });
+            }
+
+            return true;
+          } catch (supabaseError) {
+            console.warn('Failed to save deal to Supabase, falling back to localStorage:', supabaseError);
+            
+            // Fallback to localStorage
+            const existingDeals = JSON.parse(localStorage.getItem('deals-storage') || '[]');
+
+            if (currentDealId) {
+              const dealIndex = existingDeals.findIndex((d: any) => d.id === currentDealId);
+              
+              if (dealIndex !== -1) {
+                // UPDATE existing deal in localStorage
+                // Preserve original deal ID (text or UUID) and only update updatedAt
+                const existingDeal = existingDeals[dealIndex];
+                const updatedDeal = {
+                  ...existingDeal,
                   userId: user.id,
                   username: user.username,
                   userRole: user.role,
-                  activityType: 'deal_saved',
-                  dealId: currentDealId,
-                  dealName: dealDetails.customerName
-                });
-              } catch (logError) {
-                console.warn('Failed to log deal_saved activity:', logError);
+                  customerName: dealDetails.customerName,
+                  term: dealDetails.term,
+                  escalation: dealDetails.escalation,
+                  distanceToInstall: dealDetails.distanceToInstall,
+                  settlement: dealDetails.settlement,
+                  sections,
+                  factors: configStore.factors,
+                  scales: configStore.scales,
+                  totals,
+                  updatedAt: new Date().toISOString()
+                  // Note: createdAt is preserved from existingDeal
+                };
+                
+                existingDeals[dealIndex] = updatedDeal;
+                localStorage.setItem('deals-storage', JSON.stringify(existingDeals));
+                
+                return true;
               }
-              
-              return true;
             }
-          }
-          
-          // CREATE new deal
-          const newDealId = `deal_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-          const newDeal = {
-            id: newDealId,
-            userId: user.id,
-            username: user.username,
-            userRole: user.role,
-            customerName: dealDetails.customerName,
-            term: dealDetails.term,
-            escalation: dealDetails.escalation,
-            distanceToInstall: dealDetails.distanceToInstall,
-            settlement: dealDetails.settlement,
-            sections,
-            factors: configStore.factors,
-            scales: configStore.scales,
-            totals,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          };
-          
-          existingDeals.push(newDeal);
-          localStorage.setItem('deals-storage', JSON.stringify(existingDeals));
-          
-          // Set current deal ID after creating new deal
-          set({ currentDealId: newDealId });
-
-          // Log activity: deal_created
-          try {
-            const { logActivity } = await import('@/lib/activityLogger');
-            logActivity({
+            
+            // CREATE new deal in localStorage
+            // Use new UUID format for deal ID
+            const newDeal = {
+              id: dealId,
               userId: user.id,
               username: user.username,
               userRole: user.role,
-              activityType: 'deal_created',
-              dealId: newDealId,
-              dealName: dealDetails.customerName
-            });
-          } catch (logError) {
-            console.warn('Failed to log deal_created activity:', logError);
-          }
+              customerName: dealDetails.customerName,
+              term: dealDetails.term,
+              escalation: dealDetails.escalation,
+              distanceToInstall: dealDetails.distanceToInstall,
+              settlement: dealDetails.settlement,
+              sections,
+              factors: configStore.factors,
+              scales: configStore.scales,
+              totals,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            };
+            
+            existingDeals.push(newDeal);
+            localStorage.setItem('deals-storage', JSON.stringify(existingDeals));
+            
+            // Set current deal ID after creating new deal
+            set({ currentDealId: dealId });
 
-          return true;
+            return true;
+          }
         } catch (error) {
           console.error('Error saving deal:', error);
           return false;
@@ -195,26 +245,48 @@ export const useCalculatorStore = create<CalculatorState>()(
 
       loadDeal: async (dealId: string) => {
         try {
-          const allDeals = JSON.parse(localStorage.getItem('deals-storage') || '[]');
-          const deal = allDeals.find((d: any) => d.id === dealId);
+          const { supabaseHelpers } = await import('@/lib/supabase');
+          const { logActivityToSupabase } = await import('@/lib/activityLogger');
           
-          if (!deal) {
-            throw new Error('Deal not found');
+          let deal;
+          
+          try {
+            // Try to fetch deal from Supabase
+            deal = await supabaseHelpers.getDealById(dealId);
+            
+            if (!deal) {
+              throw new Error('Deal not found in Supabase');
+            }
+          } catch (supabaseError) {
+            console.warn('Failed to load deal from Supabase, falling back to localStorage:', supabaseError);
+            
+            // Fallback to localStorage
+            const allDeals = JSON.parse(localStorage.getItem('deals-storage') || '[]');
+            deal = allDeals.find((d: any) => d.id === dealId);
+            
+            if (!deal) {
+              throw new Error('Deal not found');
+            }
           }
 
           // Load deal data into the store
+          // Handle both Supabase format (sectionsData) and localStorage format (sections)
+          const sections = deal.sectionsData || deal.sections;
+          const dealDetails = deal.dealDetails || {
+            customerName: deal.customerName,
+            term: deal.term,
+            escalation: deal.escalation,
+            distanceToInstall: deal.distanceToInstall,
+            settlement: deal.settlement
+          };
+          
           set((state) => ({
-            sections: deal.sections,
-            dealDetails: {
-              customerName: deal.customerName,
-              term: deal.term,
-              escalation: deal.escalation,
-              distanceToInstall: deal.distanceToInstall,
-              settlement: deal.settlement
-            },
+            sections: sections,
+            dealDetails: dealDetails,
             originalUserContext: {
               role: deal.userRole,
-              username: deal.username
+              username: deal.username,
+              userId: deal.userId
             },
             currentDealId: dealId
           }));
@@ -225,14 +297,13 @@ export const useCalculatorStore = create<CalculatorState>()(
             const { user } = useAuthStore.getState();
             
             if (user) {
-              const { logActivity } = await import('@/lib/activityLogger');
-              logActivity({
+              await logActivityToSupabase({
                 userId: user.id,
                 username: user.username,
                 userRole: user.role,
                 activityType: 'deal_loaded',
                 dealId: dealId,
-                dealName: deal.customerName
+                dealName: dealDetails.customerName || deal.customerName
               });
             }
           } catch (logError) {
@@ -270,6 +341,83 @@ export const useCalculatorStore = create<CalculatorState>()(
             items: section.items.filter(item => !item.isTemporary)
           }))
         }));
+      },
+
+      migrateDealsToSupabase: async (): Promise<boolean> => {
+        try {
+          // Check if migration already done
+          const migrationKey = 'deals-migrated';
+          if (typeof window !== 'undefined' && localStorage.getItem(migrationKey) === 'true') {
+            return true;
+          }
+
+          const localDeals = JSON.parse(localStorage.getItem('deals-storage') || '[]');
+          
+          if (localDeals.length === 0) {
+            // No deals to migrate, mark as complete
+            if (typeof window !== 'undefined') {
+              localStorage.setItem(migrationKey, 'true');
+            }
+            return true;
+          }
+
+          const { supabaseHelpers } = await import('@/lib/supabase');
+
+          // Transform deals to match Supabase schema
+          const dealsToMigrate = localDeals.map((deal: any) => ({
+            id: deal.id,
+            userId: deal.userId,
+            username: deal.username,
+            userRole: deal.userRole,
+            customerName: deal.customerName || deal.dealDetails?.customerName,
+            dealName: deal.customerName || deal.dealDetails?.customerName,
+            dealDetails: deal.dealDetails || {
+              customerName: deal.customerName,
+              term: deal.term,
+              escalation: deal.escalation,
+              distanceToInstall: deal.distanceToInstall,
+              settlement: deal.settlement
+            },
+            sectionsData: deal.sections || deal.sectionsData,
+            totalsData: deal.totals || deal.totalsData,
+            factorsData: deal.factors || deal.factorsData,
+            scalesData: deal.scales || deal.scalesData,
+            createdAt: deal.createdAt,
+            updatedAt: deal.updatedAt
+          }));
+
+          // Migrate deals one by one to handle duplicates with upsert
+          for (const deal of dealsToMigrate) {
+            try {
+              // Check if deal already exists
+              const existingDeal = await supabaseHelpers.getDealById(deal.id).catch(() => null);
+              
+              if (existingDeal) {
+                // Update existing deal, preserving original createdAt
+                await supabaseHelpers.updateDeal(deal.id, {
+                  ...deal,
+                  createdAt: existingDeal.createdAt // Preserve original createdAt
+                });
+              } else {
+                // Create new deal
+                await supabaseHelpers.createDeal(deal);
+              }
+            } catch (error) {
+              // Log individual errors but continue with migration
+              console.warn(`Failed to migrate deal ${deal.id}:`, error);
+            }
+          }
+
+          // Mark migration as complete
+          if (typeof window !== 'undefined') {
+            localStorage.setItem(migrationKey, 'true');
+          }
+          
+          return true;
+        } catch (error) {
+          console.error('Failed to migrate deals to Supabase:', error);
+          return false;
+        }
       },
 
       calculateTotalCosts: (): TotalCosts => {
