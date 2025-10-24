@@ -50,13 +50,14 @@ export async function POST(request: NextRequest) {
       await updateSessionStatus(sessionId, 'completed');
       await addLog(sessionId, {
         timestamp: new Date().toISOString(),
-        message: `Scraping completed! Total businesses: ${progress.totalBusinesses}`,
+        message: `✅ Scraping completed! Total businesses: ${progress.totalBusinesses}`,
         level: 'success'
       });
       
       return NextResponse.json({
         status: 'completed',
-        progress: progress
+        progress: progress,
+        hasMore: false
       });
     }
 

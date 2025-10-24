@@ -6,8 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { StopScrapeResponse } from '@/lib/scraper/types';
-import { getSession, deleteSession } from '@/lib/scraper/sessionStore';
-import { errorLogger, handleApiRoute } from '@/lib/scraper';
+import { getSession, updateSessionStatus, getBusinesses } from '@/lib/scraper/supabaseSessionStore';
 import { requireScraperAuth } from '@/lib/auth-middleware';
 
 export async function POST(
@@ -18,33 +17,24 @@ export async function POST(
   const authError = requireScraperAuth(request);
   if (authError) return authError;
 
-  return handleApiRoute(async () => {
+  try {
     const { sessionId } = await params;
 
     // Validate session exists
-    const session = getSession(sessionId);
+    const session = await getSession(sessionId);
     if (!session) {
-      errorLogger.logWarning('Stop requested for non-existent session', {
-        sessionId,
-        operation: 'stop_scrape'
-      });
       return NextResponse.json(
         { error: 'Session not found' },
         { status: 404 }
       );
     }
 
-    const { orchestrator } = session;
-
-    // Get current business count before stopping
-    const businesses = orchestrator.getResults();
+    // Get current business count
+    const businesses = await getBusinesses(sessionId);
     const businessCount = businesses.length;
 
-    // Stop the orchestrator (this will cleanup browser instances)
-    await orchestrator.stop();
-
-    // Remove session from store
-    deleteSession(sessionId);
+    // Update session status to stopped
+    await updateSessionStatus(sessionId, 'stopped');
 
     // Return response
     const response: StopScrapeResponse = {
@@ -53,5 +43,11 @@ export async function POST(
     };
 
     return NextResponse.json(response, { status: 200 });
-  }, '/api/scrape/stop/:sessionId', { sessionId: (await params).sessionId });
+  } catch (error) {
+    console.error('Error stopping session:', error);
+    return NextResponse.json(
+      { error: 'Failed to stop session' },
+      { status: 500 }
+    );
+  }
 }
