@@ -48,15 +48,15 @@ export default function IndustrySelector({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2 sm:space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-gradient-to-br from-green-500 to-green-600 rounded-lg shadow-lg">
-            <Briefcase className="w-4 h-4 text-white" />
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="p-1.5 sm:p-2 bg-gradient-to-br from-green-500 to-green-600 rounded-lg shadow-lg">
+            <Briefcase className="w-3 h-3 sm:w-4 sm:h-4 text-white" />
           </div>
           <div>
-            <h3 className="text-lg font-bold text-gray-900">
+            <h3 className="text-sm sm:text-base lg:text-lg font-bold text-gray-900">
               Industry Categories
             </h3>
             <p className="text-xs text-gray-600">
@@ -64,28 +64,28 @@ export default function IndustrySelector({
             </p>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-1 sm:gap-2 text-xs sm:text-sm">
           <button
             type="button"
             onClick={handleSelectAll}
             disabled={disabled}
-            className="text-sm font-medium text-blue-600 hover:text-blue-700 hover:underline disabled:opacity-50"
+            className="font-medium text-blue-600 hover:text-blue-700 hover:underline disabled:opacity-50"
           >
-            Select All
+            All
           </button>
           <span className="text-gray-400">•</span>
           <button
             type="button"
             onClick={handleDeselectAll}
             disabled={disabled}
-            className="text-sm font-medium text-blue-600 hover:text-blue-700 hover:underline disabled:opacity-50"
+            className="font-medium text-blue-600 hover:text-blue-700 hover:underline disabled:opacity-50"
           >
-            Deselect All
+            None
           </button>
         </div>
       </div>
 
-      <div className="bg-gray-50 rounded-lg border border-gray-200 p-4 max-h-80 overflow-y-auto space-y-2">
+      <div className="bg-gray-50 rounded-lg border border-gray-200 p-2 sm:p-4 max-h-60 sm:max-h-80 overflow-y-auto space-y-1 sm:space-y-2">
         {industries.length === 0 ? (
           <p className="text-sm text-gray-500 text-center py-4">
             No industries available. Add some to get started.
@@ -95,7 +95,7 @@ export default function IndustrySelector({
             <label
               key={industry}
               className={`
-                flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-all duration-200
+                flex items-center gap-2 sm:gap-3 p-1.5 sm:p-2 rounded-lg cursor-pointer transition-all duration-200
                 ${selectedIndustries.includes(industry)
                   ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-md'
                   : 'hover:bg-white/50'
@@ -107,9 +107,9 @@ export default function IndustrySelector({
                 checked={selectedIndustries.includes(industry)}
                 onChange={() => handleToggleIndustry(industry)}
                 disabled={disabled}
-                className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                className="w-3 h-3 sm:w-4 sm:h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
               />
-              <span className={`text-sm flex-1 ${
+              <span className={`text-xs sm:text-sm flex-1 ${
                 selectedIndustries.includes(industry) ? 'text-white font-medium' : 'text-gray-700'
               }`}>
                 {industry}
@@ -125,7 +125,7 @@ export default function IndustrySelector({
                       setSelectedForRemoval([...selectedForRemoval, industry]);
                     }
                   }}
-                  className={`p-1 rounded ${
+                  className={`p-0.5 sm:p-1 rounded ${
                     selectedForRemoval.includes(industry)
                       ? 'text-red-600 bg-red-50'
                       : selectedIndustries.includes(industry)
@@ -135,9 +135,9 @@ export default function IndustrySelector({
                   title="Mark for removal"
                 >
                   {selectedForRemoval.includes(industry) ? (
-                    <CheckSquare className="w-4 h-4" />
+                    <CheckSquare className="w-3 h-3 sm:w-4 sm:h-4" />
                   ) : (
-                    <Square className="w-4 h-4" />
+                    <Square className="w-3 h-3 sm:w-4 sm:h-4" />
                   )}
                 </button>
               )}

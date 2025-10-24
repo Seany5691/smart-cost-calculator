@@ -154,11 +154,11 @@ export default function ControlPanel({
           type="button"
           onClick={onClear}
           disabled={!hasData || isActive}
-          className="btn btn-secondary flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed col-span-2 sm:col-span-1"
+          className="btn btn-secondary flex items-center justify-center gap-1 sm:gap-2 text-xs sm:text-sm py-2 disabled:opacity-50 disabled:cursor-not-allowed"
           title="Clear all data"
         >
-          <Trash2 className="w-4 h-4" />
-          <span className="hidden sm:inline">Clear All</span>
+          <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
+          <span>Clear</span>
         </button>
       </div>
 

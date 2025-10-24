@@ -65,57 +65,57 @@ const ProviderExport = React.memo(({ businesses }: ProviderExportProps) => {
   const selectedBusinessCount = businesses.filter(b => selectedProviders.has(b.provider)).length;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2 sm:space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg shadow-lg">
-            <Filter className="w-5 h-5 text-white" />
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="p-1.5 sm:p-2 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg shadow-lg">
+            <Filter className="w-3 h-3 sm:w-4 sm:h-4 lg:w-5 lg:h-5 text-white" />
           </div>
           <div>
-            <h3 className="text-xl font-bold text-gray-900">
+            <h3 className="text-sm sm:text-base lg:text-lg font-bold text-gray-900">
               Export by Provider
             </h3>
-            <p className="text-sm text-gray-600">
-              Filter and export businesses by their phone provider
+            <p className="text-xs text-gray-600 hidden sm:block">
+              Filter and export by phone provider
             </p>
           </div>
         </div>
       </div>
           {/* Selection Controls */}
-          <div className="flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-100">
-            <div className="flex items-center gap-4">
+          <div className="flex items-center justify-between p-2 sm:p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-100">
+            <div className="flex items-center gap-2 sm:gap-4 text-xs sm:text-sm">
               <button
                 onClick={handleSelectAll}
-                className="text-sm font-medium text-blue-600 hover:text-blue-700 hover:underline transition-colors"
+                className="font-medium text-blue-600 hover:text-blue-700 hover:underline transition-colors"
               >
-                Select All
+                All
               </button>
               <span className="text-gray-400">•</span>
               <button
                 onClick={handleDeselectAll}
-                className="text-sm font-medium text-blue-600 hover:text-blue-700 hover:underline transition-colors"
+                className="font-medium text-blue-600 hover:text-blue-700 hover:underline transition-colors"
               >
-                Deselect All
+                None
               </button>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-gray-700">
+            <div className="flex items-center gap-1 sm:gap-2">
+              <span className="text-xs sm:text-sm font-semibold text-gray-700">
                 {selectedProviders.size}
               </span>
-              <span className="text-sm text-gray-600">
-                provider{selectedProviders.size !== 1 ? 's' : ''} selected
+              <span className="text-xs sm:text-sm text-gray-600">
+                provider{selectedProviders.size !== 1 ? 's' : ''}
               </span>
             </div>
           </div>
 
       {/* Provider Checkboxes List */}
-      <div className="bg-gray-50 rounded-lg border border-gray-200 p-4 max-h-80 overflow-y-auto space-y-2">
+      <div className="bg-gray-50 rounded-lg border border-gray-200 p-2 sm:p-4 max-h-60 sm:max-h-80 overflow-y-auto space-y-1 sm:space-y-2">
         {providerStats.map(([provider, count]) => (
           <label
             key={provider}
             className={`
-              flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-all duration-200
+              flex items-center gap-2 sm:gap-3 p-1.5 sm:p-2 rounded-lg cursor-pointer transition-all duration-200
               ${selectedProviders.has(provider)
                 ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-md'
                 : 'hover:bg-white/50'
@@ -126,15 +126,15 @@ const ProviderExport = React.memo(({ businesses }: ProviderExportProps) => {
               type="checkbox"
               checked={selectedProviders.has(provider)}
               onChange={() => handleToggleProvider(provider)}
-              className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
+              className="w-3 h-3 sm:w-4 sm:h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
             />
-            <span className={`text-sm flex-1 ${
+            <span className={`text-xs sm:text-sm flex-1 ${
               selectedProviders.has(provider) ? 'text-white font-medium' : 'text-gray-700'
             }`}>
               {provider}
             </span>
             <span className={`
-              text-xs font-semibold px-2 py-0.5 rounded-full
+              text-xs font-semibold px-1.5 sm:px-2 py-0.5 rounded-full
               ${selectedProviders.has(provider)
                 ? 'bg-white/20 text-white'
                 : 'bg-gray-200 text-gray-500'
@@ -147,7 +147,7 @@ const ProviderExport = React.memo(({ businesses }: ProviderExportProps) => {
       </div>
 
       {/* Export Section */}
-      <div className="flex items-center justify-between p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg border border-gray-200">
+      <div className="flex items-center justify-between p-2 sm:p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg border border-gray-200">
         <div className="flex flex-col">
           <span className="text-sm font-medium text-gray-700">
             Ready to export
