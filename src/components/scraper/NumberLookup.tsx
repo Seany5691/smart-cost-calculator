@@ -67,7 +67,7 @@ export default function NumberLookup() {
           value={phoneNumber}
           onChange={(e) => setPhoneNumber(e.target.value)}
           onKeyPress={handleKeyPress}
-          placeholder="e.g., +27 68 612 8512 or 0686128512"
+          placeholder="e.g., +27 68 123 4567 or 0681234567"
           className="input flex-1"
           disabled={isLoading}
         />
