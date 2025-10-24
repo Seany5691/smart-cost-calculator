@@ -589,7 +589,7 @@ export const useScraperStore = create<ScraperState>()(
         
         set({ _isPolling: true });
         
-        // Start polling loop
+        // Start polling loop - only poll status, don't trigger processing
         const interval = setInterval(async () => {
           if (!get()._isPolling) {
             clearInterval(interval);
@@ -597,13 +597,11 @@ export const useScraperStore = create<ScraperState>()(
           }
           
           await get().pollStatus();
-          await get().processNextTown();
-        }, 3000); // Poll every 3 seconds
+        }, 2000); // Poll every 2 seconds
         
         set({ _pollingInterval: interval });
         
-        // Do first poll immediately
-        get().pollStatus();
+        // Trigger the first processing immediately (only once)
         get().processNextTown();
       },
 
@@ -665,6 +663,8 @@ export const useScraperStore = create<ScraperState>()(
         if (state.status !== 'running' && state.status !== 'pending') return;
 
         try {
+          console.log('[Processing] Calling /api/scrape/process for session:', state.sessionId);
+          
           const response = await fetch('/api/scrape/process', {
             method: 'POST',
             headers: getAuthHeaders(),
@@ -672,16 +672,26 @@ export const useScraperStore = create<ScraperState>()(
           });
 
           if (!response.ok) {
-            console.error('[Polling] Process failed:', response.status);
+            console.error('[Processing] Process failed:', response.status);
             return;
           }
 
           const data = await response.json();
-          console.log('[Polling] Process response:', data);
+          console.log('[Processing] Process response:', data);
           
-          // Status will be updated by pollStatus
+          // If there's more work to do, trigger next processing
+          if (data.hasMore && data.status === 'running') {
+            console.log('[Processing] More work to do, triggering next town...');
+            // Small delay before processing next town
+            setTimeout(() => {
+              get().processNextTown();
+            }, 1000);
+          } else if (data.status === 'completed') {
+            console.log('[Processing] All towns completed!');
+            get().stopPolling();
+          }
         } catch (error) {
-          console.error('[Polling] Error processing:', error);
+          console.error('[Processing] Error processing:', error);
         }
       },
     }),

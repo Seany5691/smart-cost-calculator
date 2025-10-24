@@ -242,8 +242,8 @@ export class ProviderLookupService {
       const markerIndex = lowerText.indexOf(marker);
       const afterMarker = cleaned.substring(markerIndex + marker.length).trim();
       
-      // Get the provider name (first word after marker)
-      const provider = afterMarker.split(/\s+/)[0];
+      // Get the provider name (first word after marker) and remove trailing punctuation
+      const provider = afterMarker.split(/\s+/)[0].replace(/[.,;:!?]+$/, '');
       console.log(`[ProviderLookup] Extracted provider: "${provider}"`);
       return provider || 'Unknown';
     }
