@@ -264,13 +264,21 @@ export class ProviderLookupService {
   }
 
   /**
-   * Cleans phone number by removing non-digit characters
-   * @param phoneNumber - Raw phone number
-   * @returns Cleaned phone number (digits only)
+   * Cleans phone number by removing non-digit characters and converting to SA format
+   * @param phoneNumber - Raw phone number (e.g., "+27 18 771 2345" or "018 771 2345")
+   * @returns Cleaned phone number in SA format (e.g., "0187712345")
    */
   private cleanPhoneNumber(phoneNumber: string): string {
     // Remove all non-digit characters
-    return phoneNumber.replace(/\D/g, '');
+    let cleaned = phoneNumber.replace(/\D/g, '');
+    
+    // Convert international format (+27...) to local format (0...)
+    // South African country code is 27
+    if (cleaned.startsWith('27')) {
+      cleaned = '0' + cleaned.substring(2);
+    }
+    
+    return cleaned;
   }
 
   /**
