@@ -688,6 +688,8 @@ export const useScraperStore = create<ScraperState>()(
             }, 1000);
           } else if (data.status === 'completed') {
             console.log('[Processing] All towns completed!');
+            // Immediately update status to completed
+            set({ status: 'completed' });
             get().stopPolling();
           }
         } catch (error) {
