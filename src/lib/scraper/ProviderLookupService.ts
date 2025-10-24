@@ -134,15 +134,26 @@ export class ProviderLookupService {
    * Creates a new browser instance
    */
   private async createBrowser(): Promise<Browser> {
-    const puppeteer = await getPuppeteer();
-    const launchOptions = getBrowserLaunchOptions(true);
-    const chromiumPath = await getChromiumPath();
-    
-    if (chromiumPath) {
-      launchOptions.executablePath = chromiumPath;
+    try {
+      console.log('[ProviderLookup] Creating browser instance...');
+      const puppeteer = await getPuppeteer();
+      const launchOptions = getBrowserLaunchOptions(true);
+      const chromiumPath = await getChromiumPath();
+      
+      if (chromiumPath) {
+        console.log('[ProviderLookup] Using Chromium path:', chromiumPath);
+        launchOptions.executablePath = chromiumPath;
+      } else {
+        console.log('[ProviderLookup] Using bundled Chromium');
+      }
+      
+      const browser = await puppeteer.default.launch(launchOptions);
+      console.log('[ProviderLookup] Browser launched successfully');
+      return browser;
+    } catch (error) {
+      console.error('[ProviderLookup] Failed to create browser:', error);
+      throw error;
     }
-    
-    return await puppeteer.default.launch(launchOptions);
   }
 
   /**

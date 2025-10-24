@@ -32,16 +32,16 @@ export class IndustryScraper {
       // Navigate to Google Maps search
       const searchQuery = `${this.industry} in ${this.town}`;
       const url = `https://www.google.com/maps/search/${encodeURIComponent(searchQuery)}`;
-      
+
       // Use 'networkidle2' for better reliability - wait until network is mostly idle
       await this.page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
-      
+
       // Wait for results to load with longer timeout
       await this.page.waitForSelector('[role="feed"]', { timeout: 20000 });
-      
+
       // Extract business data from list view (scrolling is integrated)
       const businesses = await this.extractFromListView();
-      
+
       return businesses;
     });
   }
@@ -56,28 +56,28 @@ export class IndustryScraper {
   private async extractFromListView(): Promise<Business[]> {
     const businesses: Business[] = [];
     const processedUrls = new Set<string>(); // Prevent duplicates
-    
+
     const feedSelector = '[role="feed"]';
     let hasMoreResults = true;
-    
+
     while (hasMoreResults) {
       // IMPORTANT: Use $$ (double dollar) to get ALL cards as an array
       // Select the Nv2PK parent divs which contain both the link and business details
       const cards = await this.page.$$('[role="feed"] .Nv2PK');
-      
+
       // Extract data from each card
       for (const card of cards) {
         try {
           const business = await this.parseBusinessCard(card);
-          
+
           // Skip if already processed (by URL) or missing name
           if (!business || !business.name || processedUrls.has(business.maps_address)) {
             continue;
           }
-          
+
           processedUrls.add(business.maps_address);
           businesses.push(business);
-          
+
         } catch (error) {
           // Continue processing remaining cards when individual card parsing fails (Requirement 6.5)
           errorLogger.logScrapingError(
@@ -89,10 +89,10 @@ export class IndustryScraper {
           // Continue with next card
         }
       }
-      
+
       // Check if we've reached the end
       hasMoreResults = !(await this.hasReachedEndOfList());
-      
+
       if (hasMoreResults) {
         // Scroll down to load more results
         await this.page.evaluate((selector) => {
@@ -101,12 +101,12 @@ export class IndustryScraper {
             feed.scrollTop = feed.scrollHeight;
           }
         }, feedSelector);
-        
+
         // Wait for new content to load
         await new Promise(resolve => setTimeout(resolve, 1500));
       }
     }
-    
+
     return businesses;
   }
 
@@ -133,7 +133,7 @@ export class IndustryScraper {
           { operation: 'extract_name', field: 'name' }
         );
       }
-      
+
       // Return null if name is missing (Requirement 6.1)
       if (!name) {
         errorLogger.logWarning(
@@ -142,7 +142,7 @@ export class IndustryScraper {
         );
         return null;
       }
-      
+
       // Extract Google Maps URL from anchor tag (OPTIONAL - set to empty string if missing)
       let mapsUrl = '';
       try {
@@ -160,13 +160,13 @@ export class IndustryScraper {
           { operation: 'extract_maps_url', field: 'maps_address', businessName: name }
         );
       }
-      
+
       // IMPORTANT: Use $$ (double dollar) to get ALL W4Efsd elements as an array
       const infoElements = await card.$$('.W4Efsd');
-      
+
       let phone = '';
       let address = '';
-      
+
       // Process each W4Efsd container
       for (const infoEl of infoElements) {
         // Parse phone number (look for UsdlK class) (OPTIONAL - set to empty string if missing)
@@ -187,48 +187,48 @@ export class IndustryScraper {
             { operation: 'extract_phone', field: 'phone', businessName: name }
           );
         }
-        
+
         // IMPORTANT: Use $$ (double dollar) to get ALL span elements as an array
         try {
           const spans = await infoEl.$$('span');
-          
+
           // Collect all span texts, checking if they contain UsdlK (phone) class
           for (const span of spans) {
             // Skip if this span contains the phone number (has UsdlK class)
             const hasPhoneClass = await span.evaluate((el: Element) => {
               return el.classList.contains('UsdlK') || el.querySelector('.UsdlK') !== null;
             });
-            
+
             if (hasPhoneClass) {
               continue;
             }
-            
+
             const spanText = await span.evaluate((el: Element) => el.textContent?.trim() || '');
-            
+
             // Skip empty spans, separator characters, opening hours, ratings, and icons
-            if (!spanText || 
-                spanText === '·' || 
-                spanText === '' || 
-                this.isOpeningHours(spanText) ||
-                this.looksLikeRating(spanText) ||
-                this.looksLikePhoneNumber(spanText) ||
-                spanText.toLowerCase().includes('open') ||
-                spanText.toLowerCase().includes('close') ||
-                spanText.toLowerCase().includes('wheelchair')) {
+            if (!spanText ||
+              spanText === '·' ||
+              spanText === '' ||
+              this.isOpeningHours(spanText) ||
+              this.looksLikeRating(spanText) ||
+              this.looksLikePhoneNumber(spanText) ||
+              spanText.toLowerCase().includes('open') ||
+              spanText.toLowerCase().includes('close') ||
+              spanText.toLowerCase().includes('wheelchair')) {
               continue;
             }
-            
+
             // Check if this looks like a business type (first meaningful text)
             // Business types are usually short (1-3 words) and come first
             const isBusinessType = spanText.split(' ').length <= 3 && !address;
-            
+
             // If we haven't found an address yet and this isn't a business type, it's likely the address
             if (!isBusinessType && !address) {
               // Address typically contains street indicators or is a location name
               const addressIndicators = ['street', 'ave', 'avenue', 'road', 'rd', 'drive', 'dr', 'lane', 'ln', 'way', 'blvd', 'boulevard'];
               const lowerText = spanText.toLowerCase();
               const hasAddressIndicator = addressIndicators.some(indicator => lowerText.includes(indicator));
-              
+
               // If it has address indicators or is longer than typical business type, treat as address
               if (hasAddressIndicator || spanText.length > 10) {
                 address = spanText;
@@ -246,7 +246,7 @@ export class IndustryScraper {
           );
         }
       }
-      
+
       // Create business object with all fields (empty strings for missing optional fields)
       // Always use the search industry as the type_of_business
       const business: Business = {
@@ -260,9 +260,9 @@ export class IndustryScraper {
         town: this.town,
         notes: ''
       };
-      
+
       return business;
-      
+
     } catch (error) {
       // Log error with context and continue processing remaining cards (Requirement 6.5)
       errorLogger.logScrapingError(
@@ -283,11 +283,11 @@ export class IndustryScraper {
     try {
       const endMessage = await this.page.evaluate(() => {
         const elements = Array.from(document.querySelectorAll('*'));
-        return elements.some(el => 
+        return elements.some(el =>
           el.textContent?.includes("You've reached the end of the list.")
         );
       });
-      
+
       return endMessage;
     } catch (error) {
       return false;
@@ -307,7 +307,7 @@ export class IndustryScraper {
       /\d+\s*[ap]m/i,
       /24\s*hours/i
     ];
-    
+
     return hoursPatterns.some(pattern => pattern.test(text));
   }
 
@@ -320,7 +320,7 @@ export class IndustryScraper {
     // Check if text contains mostly digits and phone-like characters
     const phonePattern = /^[\d\s\-\(\)\+]+$/;
     const digitCount = (text.match(/\d/g) || []).length;
-    
+
     // If it matches phone pattern and has at least 7 digits, it's likely a phone
     return phonePattern.test(text) && digitCount >= 7;
   }
@@ -335,7 +335,7 @@ export class IndustryScraper {
     const ratingPattern = /^\d+(\.\d+)?(\s*stars?)?$/i;
     const hasStarWord = /star/i.test(text);
     const isShortDecimal = /^\d\.\d$/.test(text);
-    
+
     return ratingPattern.test(text) || hasStarWord || isShortDecimal;
   }
 }

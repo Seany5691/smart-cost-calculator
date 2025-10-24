@@ -107,20 +107,50 @@ export async function POST(request: NextRequest) {
           .filter(phone => phone && phone !== 'No phone');
 
         if (phoneNumbers.length > 0) {
-          const providerService = new ProviderLookupService({
-            maxConcurrentBatches: 1,
-            batchSize: phoneNumbers.length
-          });
+          try {
+            await addLog(sessionId, {
+              timestamp: new Date().toISOString(),
+              message: `Looking up providers for ${phoneNumbers.length} phone numbers...`,
+              level: 'info'
+            });
 
-          const providerResults = await providerService.lookupProviders(phoneNumbers);
-          await providerService.cleanup();
+            const providerService = new ProviderLookupService({
+              maxConcurrentBatches: 1,
+              batchSize: phoneNumbers.length
+            });
 
-          businesses.forEach(business => {
-            if (business.phone && business.phone !== 'No phone') {
-              business.provider = providerResults.get(business.phone) || 'Unknown';
-            } else {
+            const providerResults = await providerService.lookupProviders(phoneNumbers);
+            await providerService.cleanup();
+
+            businesses.forEach(business => {
+              if (business.phone && business.phone !== 'No phone') {
+                business.provider = providerResults.get(business.phone) || 'Unknown';
+              } else {
+                business.provider = 'Unknown';
+              }
+            });
+
+            await addLog(sessionId, {
+              timestamp: new Date().toISOString(),
+              message: `Provider lookup completed: ${providerResults.size} providers found`,
+              level: 'success'
+            });
+          } catch (providerError) {
+            await addLog(sessionId, {
+              timestamp: new Date().toISOString(),
+              message: `Provider lookup failed: ${providerError instanceof Error ? providerError.message : 'Unknown error'}. Setting all to Unknown.`,
+              level: 'warning'
+            });
+            
+            // Set all providers to Unknown if lookup fails
+            businesses.forEach(business => {
               business.provider = 'Unknown';
-            }
+            });
+          }
+        } else {
+          // No phone numbers to lookup
+          businesses.forEach(business => {
+            business.provider = 'Unknown';
           });
         }
 
