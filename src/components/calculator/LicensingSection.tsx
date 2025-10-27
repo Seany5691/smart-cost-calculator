@@ -248,21 +248,21 @@ const LicensingSection = memo(function LicensingSection({ onNext, onPrev }: Lice
       {/* Total Licensing Cost */}
       <GlassCard className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 via-pink-500/10 to-rose-500/10"></div>
-        <div className="relative p-6 flex justify-between items-center">
-          <div className="flex items-center space-x-3">
-            <div className="p-3 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl shadow-lg">
-              <CreditCard className="w-6 h-6 text-white" />
+        <div className="relative p-4 sm:p-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
+          <div className="flex items-center space-x-2 sm:space-x-3">
+            <div className="p-2 sm:p-3 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl shadow-lg flex-shrink-0">
+              <CreditCard className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
             </div>
-            <span className="text-xl font-bold text-gray-800">
-              Total Monthly Licensing Cost:
+            <span className="text-base sm:text-xl font-bold text-gray-800 whitespace-nowrap">
+              Total Monthly Cost:
             </span>
           </div>
-          <div className="flex items-center space-x-2">
-            <Zap className="w-6 h-6 text-yellow-500 animate-pulse" />
-            <span className="text-3xl font-extrabold bg-gradient-to-r from-purple-600 via-pink-600 to-rose-600 bg-clip-text text-transparent">
+          <div className="flex items-center space-x-2 ml-auto">
+            <Zap className="w-5 h-5 sm:w-6 sm:h-6 text-yellow-500 animate-pulse flex-shrink-0" />
+            <span className="text-2xl sm:text-3xl font-extrabold bg-gradient-to-r from-purple-600 via-pink-600 to-rose-600 bg-clip-text text-transparent whitespace-nowrap">
               {formatCurrency(totalLicensingCost)}
             </span>
-            <span className="text-sm text-gray-500 font-medium">/month</span>
+            <span className="text-xs sm:text-sm text-gray-500 font-medium">/mo</span>
           </div>
         </div>
       </GlassCard>

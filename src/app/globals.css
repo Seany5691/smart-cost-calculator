@@ -380,25 +380,25 @@ a {
   animation: shimmer 2s ease-in-out infinite;
 }
 
-/* Toast animations */
+/* Toast animations - Bottom center slide up */
 @keyframes slideIn {
   from {
-    transform: translateX(100%);
+    transform: translate(-50%, 20px);
     opacity: 0;
   }
   to {
-    transform: translateX(0);
+    transform: translate(-50%, 0);
     opacity: 1;
   }
 }
 
 @keyframes slideOut {
   from {
-    transform: translateX(0);
+    transform: translate(-50%, 0);
     opacity: 1;
   }
   to {
-    transform: translateX(100%);
+    transform: translate(-50%, 20px);
     opacity: 0;
   }
 }
@@ -410,6 +410,17 @@ a {
   }
   to {
     transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slide-up {
+  from {
+    transform: translate(-50%, 20px);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, 0);
     opacity: 1;
   }
 }
@@ -498,6 +509,10 @@ a {
 
 .animate-fade-in {
   animation: fade-in 0.3s ease-in-out;
+}
+
+.animate-slide-up {
+  animation: slide-up 0.3s ease-out;
 }
 
 .toast-enter {

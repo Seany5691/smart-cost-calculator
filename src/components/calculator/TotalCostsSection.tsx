@@ -301,26 +301,26 @@ const TotalCostsSection = memo(function TotalCostsSection({ onPrev }: TotalCosts
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Hardware & Installation */}
         <GlassCard className="animate-slide-up">
-          <div className="border-b border-gray-200 pb-4 mb-6">
+          <div className="border-b border-gray-200 pb-4 mb-6 px-4 sm:px-6 pt-4 sm:pt-6">
             <h3 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
               <Package className="w-5 h-5 text-blue-600" />
               Hardware & Installation
             </h3>
           </div>
-          <div>
+          <div className="px-4 sm:px-6 pb-4 sm:pb-6">
             <table className="min-w-full divide-y divide-gray-200">
-              <tbody className="divide-y divide-gray-100 bg-white">
+              <tbody className="divide-y divide-gray-100 bg-white rounded-b-xl">
                 <tr className="hover:bg-gray-50 transition-colors">
-                  <td className="py-3 text-sm text-gray-700">Number of Extensions</td>
-                  <td className="py-3 text-sm text-gray-900 text-right font-medium">{totals.extensionCount}</td>
+                  <td className="py-3 px-3 text-sm text-gray-700">Number of Extensions</td>
+                  <td className="py-3 px-3 text-sm text-gray-900 text-right font-medium">{totals.extensionCount}</td>
                 </tr>
                 <tr className="hover:bg-gray-50 transition-colors">
-                  <td className="py-3 text-sm text-gray-700">Hardware Total</td>
-                  <td className="py-3 text-sm text-gray-900 text-right font-medium">{formatCurrency(totals.hardwareTotal)}</td>
+                  <td className="py-3 px-3 text-sm text-gray-700">Hardware Total</td>
+                  <td className="py-3 px-3 text-sm text-gray-900 text-right font-medium">{formatCurrency(totals.hardwareTotal)}</td>
                 </tr>
                 <tr className="hover:bg-gray-50 transition-colors">
-                  <td className="py-3 text-sm text-gray-700">Installation Cost</td>
-                  <td className="py-3 text-sm text-gray-900 text-right font-medium">{formatCurrency((() => {
+                  <td className="py-3 px-3 text-sm text-gray-700">Installation Cost</td>
+                  <td className="py-3 px-3 text-sm text-gray-900 text-right font-medium">{formatCurrency((() => {
                     // Get the correct installation sliding scale based on extension count
                     let slidingScaleCost = 0;
                     if (scales?.installation) {
@@ -357,8 +357,8 @@ const TotalCostsSection = memo(function TotalCostsSection({ onPrev }: TotalCosts
                   })())}</td>
                 </tr>
                 <tr className="border-t-2 border-blue-200 bg-blue-50">
-                  <td className="py-3 text-sm font-semibold text-blue-900">Subtotal (Hardware + Installation)</td>
-                  <td className="py-3 text-sm text-blue-900 text-right font-semibold">{formatCurrency((() => {
+                  <td className="py-3 px-3 text-sm font-semibold text-blue-900">Subtotal (Hardware + Installation)</td>
+                  <td className="py-3 px-3 text-sm text-blue-900 text-right font-semibold">{formatCurrency((() => {
                     // Get the correct installation sliding scale based on extension count
                     let slidingScaleCost = 0;
                     if (scales?.installation) {
@@ -397,24 +397,24 @@ const TotalCostsSection = memo(function TotalCostsSection({ onPrev }: TotalCosts
                   })())}</td>
                 </tr>
                 <tr className="hover:bg-gray-50 transition-colors">
-                  <td className="py-3 text-sm text-gray-700">Total Gross Profit</td>
-                  <td className="py-3 text-sm text-gray-900 text-right font-medium">{formatCurrency(totals.totalGrossProfit)}</td>
+                  <td className="py-3 px-3 text-sm text-gray-700">Total Gross Profit</td>
+                  <td className="py-3 px-3 text-sm text-gray-900 text-right font-medium">{formatCurrency(totals.totalGrossProfit)}</td>
                 </tr>
                 <tr className="hover:bg-gray-50 transition-colors">
-                  <td className="py-3 text-sm text-gray-700">Finance Fee</td>
-                  <td className="py-3 text-sm text-gray-900 text-right font-medium">{formatCurrency(totals.financeFee)}</td>
+                  <td className="py-3 px-3 text-sm text-gray-700">Finance Fee</td>
+                  <td className="py-3 px-3 text-sm text-gray-900 text-right font-medium">{formatCurrency(totals.financeFee)}</td>
                 </tr>
                 <tr className="hover:bg-gray-50 transition-colors">
-                  <td className="py-3 text-sm text-gray-700">Settlement Amount</td>
-                  <td className="py-3 text-sm text-gray-900 text-right font-medium">{formatCurrency(totals.settlementAmount)}</td>
+                  <td className="py-3 px-3 text-sm text-gray-700">Settlement Amount</td>
+                  <td className="py-3 px-3 text-sm text-gray-900 text-right font-medium">{formatCurrency(totals.settlementAmount)}</td>
                 </tr>
                 <tr className="font-bold border-t-2 border-green-200 bg-green-50">
-                  <td className="py-3 text-sm text-green-900">Total Payout</td>
-                  <td className="py-3 text-sm text-green-900 text-right font-bold">{formatCurrency(totals.totalPayout)}</td>
+                  <td className="py-3 px-3 text-sm text-green-900">Total Payout</td>
+                  <td className="py-3 px-3 text-sm text-green-900 text-right font-bold">{formatCurrency(totals.totalPayout)}</td>
                 </tr>
                 <tr className="hover:bg-gray-50 transition-colors">
-                  <td className="py-3 text-sm text-gray-700">Factor Used</td>
-                  <td className="py-3 text-sm text-gray-900 text-right font-medium">{totals.factorUsed.toFixed(5)}</td>
+                  <td className="py-3 px-3 text-sm text-gray-700">Factor Used</td>
+                  <td className="py-3 px-3 text-sm text-gray-900 text-right font-medium">{totals.factorUsed.toFixed(5)}</td>
                 </tr>
               </tbody>
             </table>
@@ -423,38 +423,38 @@ const TotalCostsSection = memo(function TotalCostsSection({ onPrev }: TotalCosts
 
         {/* Monthly Recurring Costs */}
         <GlassCard className="animate-slide-up" style={{ animationDelay: '0.1s' }}>
-          <div className="border-b border-gray-200 pb-4 mb-6">
+          <div className="border-b border-gray-200 pb-4 mb-6 px-4 sm:px-6 pt-4 sm:pt-6">
             <h3 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
               <TrendingUp className="w-5 h-5 text-green-600" />
               Monthly Recurring Costs
             </h3>
           </div>
-          <div>
+          <div className="px-4 sm:px-6 pb-4 sm:pb-6">
             <table className="min-w-full divide-y divide-gray-200">
-              <tbody className="divide-y divide-gray-100 bg-white">
+              <tbody className="divide-y divide-gray-100 bg-white rounded-b-xl">
                 <tr className="hover:bg-gray-50 transition-colors">
-                  <td className="py-3 text-sm text-gray-700">Hardware Rental</td>
-                  <td className="py-3 text-sm text-gray-900 text-right font-medium">{formatCurrency(totals.hardwareRental)}</td>
+                  <td className="py-3 px-3 text-sm text-gray-700">Hardware Rental</td>
+                  <td className="py-3 px-3 text-sm text-gray-900 text-right font-medium">{formatCurrency(totals.hardwareRental)}</td>
                 </tr>
                 <tr className="hover:bg-gray-50 transition-colors">
-                  <td className="py-3 text-sm text-gray-700">Connectivity Cost</td>
-                  <td className="py-3 text-sm text-gray-900 text-right font-medium">{formatCurrency(totals.connectivityCost)}</td>
+                  <td className="py-3 px-3 text-sm text-gray-700">Connectivity Cost</td>
+                  <td className="py-3 px-3 text-sm text-gray-900 text-right font-medium">{formatCurrency(totals.connectivityCost)}</td>
                 </tr>
                 <tr className="hover:bg-gray-50 transition-colors">
-                  <td className="py-3 text-sm text-gray-700">Licensing Cost</td>
-                  <td className="py-3 text-sm text-gray-900 text-right font-medium">{formatCurrency(totals.licensingCost)}</td>
+                  <td className="py-3 px-3 text-sm text-gray-700">Licensing Cost</td>
+                  <td className="py-3 px-3 text-sm text-gray-900 text-right font-medium">{formatCurrency(totals.licensingCost)}</td>
                 </tr>
                 <tr className="font-bold border-t-2 border-blue-200 bg-blue-50">
-                  <td className="py-3 text-sm text-blue-900">Total MRC</td>
-                  <td className="py-3 text-sm text-blue-900 text-right font-semibold">{formatCurrency(totals.totalMRC)}</td>
+                  <td className="py-3 px-3 text-sm text-blue-900">Total MRC</td>
+                  <td className="py-3 px-3 text-sm text-blue-900 text-right font-semibold">{formatCurrency(totals.totalMRC)}</td>
                 </tr>
                 <tr className="hover:bg-gray-50 transition-colors">
-                  <td className="py-3 text-sm text-gray-700">Total Ex VAT</td>
-                  <td className="py-3 text-sm text-gray-900 text-right font-medium">{formatCurrency(totals.totalExVat)}</td>
+                  <td className="py-3 px-3 text-sm text-gray-700">Total Ex VAT</td>
+                  <td className="py-3 px-3 text-sm text-gray-900 text-right font-medium">{formatCurrency(totals.totalExVat)}</td>
                 </tr>
                 <tr className="font-bold border-t-2 border-green-200 bg-green-50">
-                  <td className="py-3 text-sm text-green-900">Total Inc VAT (15%)</td>
-                  <td className="py-3 text-sm text-green-900 text-right font-bold">{formatCurrency(totals.totalIncVat)}</td>
+                  <td className="py-3 px-3 text-sm text-green-900 rounded-bl-xl">Total Inc VAT (15%)</td>
+                  <td className="py-3 px-3 text-sm text-green-900 text-right font-bold rounded-br-xl">{formatCurrency(totals.totalIncVat)}</td>
                 </tr>
               </tbody>
             </table>
