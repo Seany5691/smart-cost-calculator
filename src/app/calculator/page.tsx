@@ -76,7 +76,7 @@ function CalculatorPageContent() {
                    type === 'warning' ? 'bg-yellow-100 border-yellow-400 text-yellow-700' :
                    'bg-blue-100 border-blue-400 text-blue-700';
     
-    notification.className = `fixed top-20 left-1/2 transform -translate-x-1/2 ${bgColor} px-4 py-2 rounded-lg shadow-lg z-50 animate-slide-down`;
+    notification.className = `fixed bottom-20 left-1/2 transform -translate-x-1/2 ${bgColor} px-4 py-2 rounded-lg shadow-lg z-[9999] animate-slide-up`;
     notification.innerHTML = `
       <div class="flex items-center space-x-2">
         <span class="text-sm font-medium">${message}</span>
@@ -87,7 +87,9 @@ function CalculatorPageContent() {
     // Remove notification after 2 seconds
     setTimeout(() => {
       if (notification.parentNode) {
-        notification.style.animation = 'slideOut 0.3s ease-in forwards';
+        notification.style.opacity = '0';
+        notification.style.transform = 'translate(-50%, 20px)';
+        notification.style.transition = 'all 0.3s ease-in';
         setTimeout(() => {
           notification.remove();
         }, 300);
@@ -199,35 +201,13 @@ function CalculatorPageContent() {
       }
     };
 
-    // Hide navigation by default when component mounts
-    setShowMainNav(false);
-    
-    // Apply initial transform to hide navigation
-    const nav = document.querySelector('nav');
-    if (nav) {
-      nav.style.transform = 'translateY(-100%)';
-      nav.style.transition = 'transform 0.3s ease-in-out';
-    }
-
+    // Navigation is now always visible - removed hiding logic
     window.addEventListener('scroll', handleScroll, { passive: true });
     
     return () => {
       window.removeEventListener('scroll', handleScroll);
-      // Reset navigation when leaving calculator
-      const nav = document.querySelector('nav');
-      if (nav) {
-        nav.style.transform = 'translateY(0)';
-      }
     };
   }, []);
-
-  // Update navigation visibility
-  useEffect(() => {
-    const nav = document.querySelector('nav');
-    if (nav) {
-      nav.style.transform = showMainNav ? 'translateY(0)' : 'translateY(-100%)';
-    }
-  }, [showMainNav]);
 
   if (!isAuthenticated) {
     return null;
@@ -337,7 +317,7 @@ function CalculatorPageContent() {
     if (!canProceed) {
       // Create a more user-friendly notification instead of alert
       const notification = document.createElement('div');
-      notification.className = 'fixed top-20 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg shadow-lg z-50 animate-slide-down';
+      notification.className = 'fixed bottom-20 left-1/2 transform -translate-x-1/2 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg shadow-lg z-[9999] animate-slide-up max-w-md';
       notification.innerHTML = `
         <div class="flex items-center space-x-2">
           <span class="text-lg">⚠️</span>
@@ -349,7 +329,9 @@ function CalculatorPageContent() {
       // Remove notification after 4 seconds
       setTimeout(() => {
         if (notification.parentNode) {
-          notification.style.animation = 'slideOut 0.3s ease-in forwards';
+          notification.style.opacity = '0';
+          notification.style.transform = 'translate(-50%, 20px)';
+          notification.style.transition = 'all 0.3s ease-in';
           setTimeout(() => {
             notification.remove();
           }, 300);
@@ -364,7 +346,7 @@ function CalculatorPageContent() {
       
       // Show success feedback for progression
       const successNotification = document.createElement('div');
-      successNotification.className = 'fixed top-20 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg shadow-lg z-50 animate-slide-down';
+      successNotification.className = 'fixed bottom-20 left-1/2 transform -translate-x-1/2 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg shadow-lg z-[9999] animate-slide-up';
       successNotification.innerHTML = `
         <div class="flex items-center space-x-2">
           <span class="text-lg">✅</span>
@@ -376,7 +358,9 @@ function CalculatorPageContent() {
       // Remove notification after 2 seconds
       setTimeout(() => {
         if (successNotification.parentNode) {
-          successNotification.style.animation = 'slideOut 0.3s ease-in forwards';
+          successNotification.style.opacity = '0';
+          successNotification.style.transform = 'translate(-50%, 20px)';
+          successNotification.style.transition = 'all 0.3s ease-in';
           setTimeout(() => {
             successNotification.remove();
           }, 300);
@@ -416,7 +400,7 @@ function CalculatorPageContent() {
       )}
 
       {/* Enhanced Fixed Tabs and Navigation Container - Glassmorphism */}
-      <div className="flex-shrink-0 bg-white/80 backdrop-blur-xl shadow-2xl border-b border-white/20 z-50 relative">
+      <div className="flex-shrink-0 bg-white/80 backdrop-blur-xl shadow-2xl border-b border-white/20 z-40 relative">
         {/* Gradient overlay */}
         <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 via-purple-500/5 to-pink-500/5 pointer-events-none"></div>
         {/* Futuristic Tabs with Glassmorphism - Mobile Responsive */}
@@ -484,21 +468,17 @@ function CalculatorPageContent() {
         {/* Futuristic Navigation Bar with Glassmorphism - Mobile Optimized */}
         <div className="bg-gradient-to-r from-blue-50/80 to-purple-50/80 backdrop-blur-sm border-t border-white/30 relative">
           <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-purple-500/5"></div>
-          <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-3 sm:py-4 relative">
+          <div className="max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-2 sm:py-3 relative">
             <div className="flex justify-between items-center gap-2 sm:gap-4">
               {/* Futuristic Previous Button - Mobile Optimized */}
               <div className="flex-1 min-w-0">
                 {tabIndex > 0 ? (
                   <button 
                     onClick={handlePrevTab}
-                    className="relative overflow-hidden group bg-white/60 backdrop-blur-sm border border-white/40 hover:bg-white/80 hover:shadow-xl transition-all duration-300 transform hover:scale-105 active:scale-95 rounded-xl px-3 sm:px-5 py-2 sm:py-3 flex items-center space-x-2 sm:space-x-3 w-full sm:w-auto justify-center sm:justify-start"
+                    className="relative overflow-hidden group bg-white/60 backdrop-blur-sm border border-white/40 hover:bg-white/80 hover:shadow-xl transition-all duration-300 transform hover:scale-105 active:scale-95 rounded-lg px-3 sm:px-4 py-1.5 sm:py-2 flex items-center space-x-2 w-full sm:w-auto justify-center sm:justify-start"
                   >
                     <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5 group-hover:animate-bounce flex-shrink-0 text-blue-600" />
-                    <div className="flex flex-col items-start min-w-0">
-                      <span className="text-[10px] sm:text-xs text-gray-500 hidden sm:block font-medium">Previous</span>
-                      <span className="hidden md:inline font-semibold text-gray-700 truncate">{tabs[tabIndex - 1]?.name}</span>
-                      <span className="md:hidden font-semibold text-gray-700">Back</span>
-                    </div>
+                    <span className="font-semibold text-gray-700 text-xs sm:text-sm truncate">{tabs[tabIndex - 1]?.name}</span>
                     <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                   </button>
                 ) : (
@@ -512,11 +492,11 @@ function CalculatorPageContent() {
               {/* Futuristic Progress Indicator - Mobile Optimized */}
               <div className="flex items-center space-x-2 sm:space-x-4 flex-shrink-0">
                 {/* Glassmorphism Step Counter */}
-                <div className="bg-white/80 backdrop-blur-sm rounded-full px-3 sm:px-4 py-2 shadow-lg border border-white/40 flex items-center space-x-2 sm:space-x-3">
-                  <span className="text-xs sm:text-base text-gray-700 font-bold whitespace-nowrap">
+                <div className="bg-white/80 backdrop-blur-sm rounded-full px-2.5 sm:px-3 py-1 sm:py-1.5 shadow-lg border border-white/40 flex items-center space-x-1.5 sm:space-x-2">
+                  <span className="text-xs sm:text-sm text-gray-700 font-bold whitespace-nowrap">
                     {tabIndex + 1}/{tabs.length}
                   </span>
-                  <span className="text-xs sm:text-sm font-extrabold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent hidden sm:inline">
+                  <span className="text-xs font-extrabold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent hidden sm:inline">
                     • {Math.round(((tabIndex + 1) / tabs.length) * 100)}%
                   </span>
                 </div>
@@ -537,26 +517,22 @@ function CalculatorPageContent() {
                 {tabIndex < tabs.length - 1 ? (
                   <button
                     onClick={handleNextTab}
-                    className="relative overflow-hidden group bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold rounded-xl px-3 sm:px-6 py-2 sm:py-3 shadow-lg hover:shadow-glow-lg transform hover:scale-105 active:scale-95 transition-all duration-300 flex items-center space-x-2 sm:space-x-3 w-full sm:w-auto justify-center sm:justify-end"
+                    className="relative overflow-hidden group bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold rounded-lg px-3 sm:px-4 py-1.5 sm:py-2 shadow-lg hover:shadow-glow-lg transform hover:scale-105 active:scale-95 transition-all duration-300 flex items-center space-x-2 w-full sm:w-auto justify-center sm:justify-end"
                   >
-                    <div className="flex flex-col items-end min-w-0 relative z-10">
-                      <span className="text-[10px] sm:text-xs text-white/80 hidden sm:block font-medium">Next</span>
-                      <span className="hidden md:inline font-bold truncate">{tabs[tabIndex + 1]?.name}</span>
-                      <span className="md:hidden font-bold">Next</span>
-                    </div>
+                    <span className="font-bold text-xs sm:text-sm truncate relative z-10">{tabs[tabIndex + 1]?.name}</span>
                     <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 group-hover:animate-bounce flex-shrink-0 relative z-10" />
                     
                     {/* Ripple effect */}
-                    <div className="absolute inset-0 bg-white/20 scale-0 group-active:scale-100 transition-transform duration-300 rounded-xl"></div>
+                    <div className="absolute inset-0 bg-white/20 scale-0 group-active:scale-100 transition-transform duration-300 rounded-lg"></div>
                     
                     {/* Glow effect */}
                     <div className="absolute inset-0 bg-gradient-to-r from-blue-400/50 to-purple-400/50 blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
                   </button>
                 ) : (
-                  <div className="relative overflow-hidden flex items-center space-x-2 sm:space-x-3 text-green-600 font-bold bg-gradient-to-r from-green-50 to-emerald-50 px-3 sm:px-6 py-2 sm:py-3 rounded-xl border-2 border-green-200 shadow-lg text-xs sm:text-base">
-                    <span className="hidden sm:inline">Workflow Complete!</span>
+                  <div className="relative overflow-hidden flex items-center space-x-2 text-green-600 font-bold bg-gradient-to-r from-green-50 to-emerald-50 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg border-2 border-green-200 shadow-lg text-xs sm:text-sm">
+                    <span className="hidden sm:inline">Complete!</span>
                     <span className="sm:hidden">Done!</span>
-                    <span className="text-xl sm:text-2xl animate-bounce">🎉</span>
+                    <span className="text-base sm:text-lg animate-bounce">🎉</span>
                     <div className="absolute inset-0 bg-gradient-to-r from-green-200/20 to-emerald-200/20 animate-pulse"></div>
                   </div>
                 )}

@@ -42,6 +42,7 @@ export interface DealDetails {
   settlementRentalAmount?: number;
   settlementEscalationRate?: number;
   settlementRentalType?: 'starting' | 'current';
+  customGrossProfit?: number | null;
 }
 
 export interface FactorData {

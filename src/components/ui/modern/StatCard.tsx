@@ -57,34 +57,34 @@ export function StatCard({
   return (
     <div 
       className={cn(
-        'group relative bg-gradient-to-br from-white to-gray-50 rounded-2xl p-6',
-        'shadow-lg border border-gray-200',
-        'hover:shadow-2xl transition-all duration-300 hover:-translate-y-1',
+        'group relative bg-gradient-to-br from-white to-gray-50 rounded-xl p-3 sm:p-4',
+        'shadow-md border border-gray-200',
+        'hover:shadow-lg transition-all duration-300 hover:-translate-y-0.5',
         className
       )}
       style={style}
     >
       {/* Gradient overlay on hover */}
-      <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-purple-500/5 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+      <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-purple-500/5 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
       
-      <div className="relative">
+      <div className="relative flex items-center space-x-3">
         {/* Icon */}
-        <div className="inline-flex p-3 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl shadow-lg group-hover:scale-110 transition-transform duration-300">
-          <Icon className="w-6 h-6 text-white" />
+        <div className="flex-shrink-0 inline-flex p-2 sm:p-2.5 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg shadow-md group-hover:scale-105 transition-transform duration-300">
+          <Icon className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
         </div>
         
-        {/* Value */}
-        <div className="mt-4">
-          <p className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+        {/* Value and Label */}
+        <div className="flex-1 min-w-0">
+          <p className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
             {prefix}{typeof value === 'number' ? displayValue.toLocaleString() : value}{suffix}
           </p>
-          <p className="text-sm text-gray-600 mt-1">{label}</p>
+          <p className="text-xs sm:text-sm text-gray-600 truncate">{label}</p>
         </div>
         
-        {/* Trend indicator */}
+        {/* Trend indicator - only show on larger screens */}
         {trend !== undefined && (
           <div className={cn(
-            'mt-2 inline-flex items-center space-x-1 text-sm font-medium px-2 py-1 rounded-lg',
+            'hidden sm:inline-flex items-center space-x-1 text-xs font-medium px-2 py-1 rounded-md flex-shrink-0',
             trend > 0 ? 'text-green-600 bg-green-50' : trend < 0 ? 'text-red-600 bg-red-50' : 'text-gray-600 bg-gray-50'
           )}>
             <span>{trend > 0 ? '↑' : trend < 0 ? '↓' : '→'}</span>

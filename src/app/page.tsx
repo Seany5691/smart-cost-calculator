@@ -63,14 +63,6 @@ export default function DashboardPage() {
       textColor: 'text-blue-500'
     },
     {
-      title: 'Documentation',
-      description: 'View user guides and help',
-      icon: FileText,
-      href: '/documentation',
-      color: 'bg-green-500',
-      textColor: 'text-green-500'
-    },
-    {
       title: user?.role === 'admin' ? 'All Deal Calculations' : 'My Deal Calculations',
       description: user?.role === 'admin' ? 'View all user deal calculations' : 'View and continue your saved calculations',
       icon: FolderOpen,
@@ -85,7 +77,15 @@ export default function DashboardPage() {
       href: '/scraper',
       color: 'bg-teal-500',
       textColor: 'text-teal-500'
-    }] : [])
+    }] : []),
+    {
+      title: 'Instructions',
+      description: 'View user guides and help',
+      icon: FileText,
+      href: '/documentation',
+      color: 'bg-green-500',
+      textColor: 'text-green-500'
+    }
   ];
 
   // Add admin-specific actions
@@ -162,8 +162,17 @@ export default function DashboardPage() {
         })}
       </div>
 
+      {/* Recent Activity Section */}
+      <div className="mt-8 relative z-10 animate-fade-in-up" style={!isMobile ? { animationDelay: '0.7s' } : undefined}>
+        <ActivityTimeline 
+          userRole={user.role as 'admin' | 'manager' | 'user'} 
+          currentUserId={user.id}
+          isMobile={isMobile}
+        />
+      </div>
+
       {/* Stats Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 relative z-10">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4 md:gap-6 mt-8 relative z-10">
         {isLoadingStats ? (
           <>
             <StatCardSkeleton isMobile={isMobile} />
@@ -179,7 +188,7 @@ export default function DashboardPage() {
               trend={0}
               animated
               className="animate-fade-in-up"
-              style={!isMobile ? ({ animationDelay: '0.7s' } as React.CSSProperties) : undefined}
+              style={!isMobile ? ({ animationDelay: '0.8s' } as React.CSSProperties) : undefined}
             />
             <StatCard
               label="Active Projects"
@@ -188,7 +197,7 @@ export default function DashboardPage() {
               trend={0}
               animated
               className="animate-fade-in-up"
-              style={!isMobile ? ({ animationDelay: '0.8s' } as React.CSSProperties) : undefined}
+              style={!isMobile ? ({ animationDelay: '0.9s' } as React.CSSProperties) : undefined}
             />
             <StatCard
               label="Calculations"
@@ -197,28 +206,10 @@ export default function DashboardPage() {
               trend={0}
               animated
               className="animate-fade-in-up"
-              style={!isMobile ? ({ animationDelay: '0.9s' } as React.CSSProperties) : undefined}
+              style={!isMobile ? ({ animationDelay: '1.0s' } as React.CSSProperties) : undefined}
             />
           </>
         )}
-      </div>
-
-      {/* Recent Activity Section */}
-      <div className="mt-8 relative z-10 animate-fade-in-up" style={!isMobile ? { animationDelay: '1.0s' } : undefined}>
-        <div className="flex items-center space-x-2 mb-4">
-          <Clock className="w-5 h-5 text-purple-500 animate-pulse" />
-          <h2 className="text-2xl font-semibold">
-            <GradientText>Recent Activity</GradientText>
-          </h2>
-        </div>
-        
-        <GlassCard className="p-6">
-          <ActivityTimeline 
-            userRole={user.role as 'admin' | 'manager' | 'user'} 
-            currentUserId={user.id}
-            isMobile={isMobile}
-          />
-        </GlassCard>
       </div>
     </div>
   );

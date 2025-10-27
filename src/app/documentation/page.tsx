@@ -2,12 +2,13 @@
 
 import { useAuthStore } from '@/store/auth';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
-import { BookOpen, Calculator, Settings, Users, FileText, HelpCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { BookOpen, Calculator, FileText, HelpCircle, Search } from 'lucide-react';
 
 export default function DocumentationPage() {
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, user } = useAuthStore();
   const router = useRouter();
+  const [activeTab, setActiveTab] = useState(0);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -26,141 +27,239 @@ export default function DocumentationPage() {
     items?: string[];
   };
 
-  type Section = {
-    title: string;
+  type Tab = {
+    name: string;
     icon: typeof BookOpen;
     content: ContentItem[];
   };
 
-  const sections: Section[] = [
+  const hasScraperAccess = user?.role === 'admin' || user?.role === 'manager';
+
+  const tabs: Tab[] = [
     {
-      title: 'Getting Started',
+      name: 'Getting Started',
       icon: BookOpen,
       content: [
         {
-          subtitle: 'How to Use the Calculator',
-          text: 'The Smart Cost Calculator is a comprehensive tool for calculating deal costs from start to finish. Follow these steps to create a new deal calculation:',
-          steps: [
-            '1. Navigate to the Calculator page from the dashboard',
-            '2. Fill in the Deal Details including customer name, term, and escalation',
-            '3. Select hardware items and quantities',
-            '4. Choose connectivity services',
-            '5. Add licensing requirements',
-            '6. Calculate settlement amounts if applicable',
-            '7. Review the total costs summary',
-            '8. Generate PDF reports or proposals'
-          ]
+          subtitle: 'Welcome',
+          text: 'The Smart Cost Calculator helps you create accurate cost calculations for smart technology deals. From the dashboard, you can access the calculator, view your saved deals, and use other features.'
+        },
+        {
+          subtitle: 'Quick Navigation',
+          text: 'Use the dashboard cards to quickly access:',
+          items: [
+            '• Calculator - Create new deal calculations',
+            '• My Deal Calculations - View and load your saved deals',
+            hasScraperAccess ? '• Smart Scraper - Find business contact information' : '',
+            '• Instructions - This help page'
+          ].filter(Boolean)
+        },
+        {
+          subtitle: 'First Time Using the App?',
+          text: 'Start by exploring the Calculator tab to learn how to create a deal calculation step by step.'
         }
       ]
     },
     {
-      title: 'Calculator Sections',
+      name: 'Calculator',
       icon: Calculator,
       content: [
         {
-          subtitle: 'Deal Details',
-          text: 'Enter basic information about the deal including customer name, contract term, escalation rate, distance to install, and additional gross profit.'
-        },
-        {
-          subtitle: 'Hardware Selection',
-          text: 'Select hardware items and quantities. Items marked as "Extension" are counted separately for extension point calculations. You can also add temporary custom items.'
-        },
-        {
-          subtitle: 'Connectivity',
-          text: 'Choose connectivity services and their monthly costs. These are recurring monthly charges that will be included in the total MRC calculation.'
-        },
-        {
-          subtitle: 'Licensing',
-          text: 'Select software licenses and their quantities. These are also recurring monthly costs included in the MRC calculation.'
-        },
-        {
-          subtitle: 'Settlement Calculator',
-          text: 'Calculate settlement amounts for existing rental contracts. Enter the start date, rental amount, escalation rate, and term to calculate the remaining settlement value.'
-        },
-        {
-          subtitle: 'Total Costs',
-          text: 'Review the complete cost breakdown including hardware costs, installation, gross profit, finance fees, and monthly recurring costs with VAT calculations.'
-        }
-      ]
-    },
-    {
-      title: 'User Roles & Pricing',
-      icon: Users,
-      content: [
-        {
-          subtitle: 'Role-Based Pricing',
-          text: 'The system supports three user roles with different pricing structures:',
+          subtitle: 'Step 1: Deal Details',
+          text: 'Enter basic information about your deal:',
           items: [
-            'Admin: Full access to all features and admin pricing',
-            'Manager: Access to manager pricing and most features',
-            'User: Standard user pricing and basic features'
+            '• Customer Name - Required field',
+            '• Deal Name - Give your calculation a reference name',
+            '• Contract Term - Select 36, 48, or 60 months',
+            '• Escalation Rate - Choose 0%, 10%, or 15%',
+            '• Distance - Travel distance for installation',
+            '• Settlement Amount - Any existing contract settlement'
           ]
         },
         {
-          subtitle: 'Pricing Differences',
-          text: 'Manager and User roles may see different pricing for hardware, licensing, and connectivity items. This allows for flexible pricing strategies based on user permissions.'
+          subtitle: 'Step 2: Hardware',
+          text: 'Select the devices and equipment needed:',
+          items: [
+            '• Browse available hardware items',
+            '• Enter quantities for each item',
+            '• Items marked "Extension" are counted separately',
+            '• Total hardware cost updates automatically'
+          ]
+        },
+        {
+          subtitle: 'Step 3: Connectivity',
+          text: 'Choose internet and connectivity services:',
+          items: [
+            '• Select connectivity packages (fiber, LTE, etc.)',
+            '• Set quantities for each service',
+            '• These are monthly recurring costs'
+          ]
+        },
+        {
+          subtitle: 'Step 4: Licensing',
+          text: 'Add software licenses:',
+          items: [
+            '• Choose required licensing packages',
+            '• Set quantities needed',
+            '• These are monthly recurring costs'
+          ]
+        },
+        {
+          subtitle: 'Step 5: Settlement',
+          text: 'Review automatically calculated costs:',
+          items: [
+            '• Installation costs based on number of points',
+            '• Extension costs for extension items',
+            '• Fuel costs based on distance',
+            '• Finance fees',
+            '• Settlement comparison'
+          ]
+        },
+        {
+          subtitle: 'Step 6: Total Costs',
+          text: 'Review and export:',
+          items: [
+            '• See complete cost summary',
+            '• Generate PDF proposal',
+            '• Save deal for later',
+            '• Load previously saved deals'
+          ]
         }
       ]
     },
-    {
-      title: 'Admin Features',
-      icon: Settings,
+    ...(hasScraperAccess ? [{
+      name: 'Smart Scraper',
+      icon: Search,
       content: [
         {
-          subtitle: 'Hardware Configuration',
-          text: 'Admins can configure hardware items with different pricing for managers and users. Items can be marked as extensions and locked to prevent changes.'
+          subtitle: 'What is Smart Scraper?',
+          text: 'Smart Scraper finds business contact information from Google Maps. Search multiple towns and industries at once, then export results to Excel.'
         },
         {
-          subtitle: 'Factor Sheet Management',
-          text: 'Configure financing factors based on term, escalation, and finance amount ranges. These factors determine the monthly hardware rental calculations.'
+          subtitle: 'How to Use',
+          text: 'Follow these steps:',
+          steps: [
+            '1. Enter town names (one per line)',
+            '2. Select industries from the list or add custom ones',
+            '3. Adjust concurrency settings if needed',
+            '4. Click "Start Scraping"',
+            '5. Watch the progress bar',
+            '6. Export results to Excel when complete'
+          ]
         },
         {
-          subtitle: 'Scales Configuration',
-          text: 'Set up distance bands and additional costs including cost per extension point with different pricing for different user roles.'
+          subtitle: 'Lookup Tools',
+          text: 'Quick lookup options:',
+          items: [
+            '• Number Lookup - Find business by phone number',
+            '• Business Lookup - Search by business name'
+          ]
         },
         {
-          subtitle: 'User Management',
-          text: 'Add, edit, and remove users. Assign roles and manage user permissions. The default admin user (Camryn) cannot be modified.'
+          subtitle: 'Managing Results',
+          text: 'After scraping:',
+          items: [
+            '• View all results in the table',
+            '• Export by provider (Vodacom, MTN, Cell C, Telkom)',
+            '• Export all results to Excel',
+            '• Save sessions to resume later',
+            '• Clear data to start fresh'
+          ]
+        },
+        {
+          subtitle: 'Tips',
+          text: 'Best practices:',
+          items: [
+            '• Test with 1-2 towns first',
+            '• Select specific industries',
+            '• Lower concurrency if you have issues',
+            '• Save sessions for large jobs',
+            '• Export results immediately'
+          ]
         }
-      ]
-    },
+      ] as ContentItem[]
+    }] : []),
     {
-      title: 'Reports & Outputs',
+      name: 'Saving & Loading',
       icon: FileText,
       content: [
         {
-          subtitle: 'PDF Generation',
-          text: 'Generate detailed PDF reports of the complete cost breakdown for presentation to customers or internal review.'
+          subtitle: 'Saving Your Work',
+          text: 'Save deals to access them later:',
+          steps: [
+            '1. Complete your deal calculation',
+            '2. Go to the Total Costs section',
+            '3. Click "Save Deal"',
+            '4. Your deal is saved to the database',
+            '5. Access it from "My Deal Calculations"'
+          ]
         },
         {
-          subtitle: 'Proposal Generation',
-          text: 'Create professional proposals with all deal details, costs, and terms formatted for customer presentation.'
+          subtitle: 'Loading Saved Deals',
+          text: 'Retrieve previous calculations:',
+          steps: [
+            '1. Go to "My Deal Calculations"',
+            '2. Browse your saved deals',
+            '3. Click "Load" on any deal',
+            '4. Calculator opens with data pre-filled',
+            '5. Make changes and save again if needed'
+          ]
         },
         {
-          subtitle: 'Deal Pack Generation',
-          text: 'Generate comprehensive deal packs including all documentation, pricing, and terms for complete deal documentation.'
+          subtitle: 'Deal Management',
+          text: 'Your saved deals include all calculation details, hardware selections, connectivity, licensing, and final costs. You can load any deal to review or create a similar calculation.'
         }
       ]
     },
     {
-      title: 'Tips & Best Practices',
+      name: 'Help & Tips',
       icon: HelpCircle,
       content: [
         {
-          subtitle: 'Accurate Calculations',
-          text: 'Always double-check your inputs, especially dates and amounts. The settlement calculator is particularly sensitive to accurate start dates.'
+          subtitle: 'Mobile Usage',
+          text: 'The app works great on phones and tablets:',
+          items: [
+            '• Card layouts on small screens',
+            '• Touch-friendly buttons',
+            '• No horizontal scrolling',
+            '• Use the menu (☰) to navigate'
+          ]
         },
         {
-          subtitle: 'Extension Points',
-          text: 'Make sure to mark hardware items as extensions if they represent extension points. This affects the extension cost calculations.'
+          subtitle: 'Common Questions',
+          text: 'How do I reset my password?',
+          items: [
+            '• Contact your system administrator'
+          ]
         },
         {
-          subtitle: 'Settlement Calculations',
-          text: 'When calculating settlements, ensure you use the correct rental type (starting vs current) and that all dates are accurate.'
+          subtitle: '',
+          text: 'Can I delete a saved deal?',
+          items: [
+            '• Contact your admin to remove deals'
+          ]
         },
         {
-          subtitle: 'Pricing Updates',
-          text: 'Admins should regularly review and update pricing to ensure accuracy. Changes to factors and scales affect all future calculations.'
+          subtitle: '',
+          text: 'What if I lose internet connection?',
+          items: [
+            '• Calculator stores work locally',
+            '• You need internet to save/load deals'
+          ]
+        },
+        {
+          subtitle: 'Best Practices',
+          text: 'Tips for success:',
+          items: [
+            '• Save your work frequently',
+            '• Review calculations before sending to customers',
+            '• Try features on test deals first',
+            '• Check this help page if you\'re stuck'
+          ]
+        },
+        {
+          subtitle: 'Getting Support',
+          text: 'If you need help, contact your system administrator.'
         }
       ]
     }
@@ -168,100 +267,95 @@ export default function DocumentationPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold gradient-text mb-4">
-            Documentation & Help
+        <div className="text-center mb-6 sm:mb-8">
+          <h1 className="text-3xl sm:text-4xl font-bold gradient-text mb-2 sm:mb-3">
+            Instructions
           </h1>
-          <p className="text-gray-600 text-lg">
-            Complete guide to using the Smart Cost Calculator
+          <p className="text-gray-600 text-sm sm:text-base px-4">
+            Learn how to use the Smart Cost Calculator
           </p>
         </div>
 
-        {/* Documentation Sections */}
-        <div className="space-y-8">
-          {sections.map((section, index) => {
-            const Icon = section.icon;
-            return (
-              <div key={index} className="card-gradient">
-                <div className="border-b border-gray-200 p-6">
-                  <div className="flex items-center space-x-3">
-                    <div className="p-2 bg-blue-100 rounded-lg">
-                      <Icon className="w-6 h-6 text-blue-600" />
+        {/* Tabs Navigation */}
+        <div className="card-gradient mb-6">
+          <div className="border-b border-gray-200 overflow-x-auto">
+            <div className="flex min-w-max sm:min-w-0">
+              {tabs.map((tab, index) => {
+                const Icon = tab.icon;
+                const isActive = activeTab === index;
+                return (
+                  <button
+                    key={index}
+                    onClick={() => setActiveTab(index)}
+                    className={`
+                      flex items-center space-x-2 px-4 sm:px-6 py-3 sm:py-4 font-medium text-sm sm:text-base
+                      transition-all duration-200 border-b-2 whitespace-nowrap
+                      ${isActive
+                        ? 'border-blue-600 text-blue-600 bg-blue-50/50'
+                        : 'border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                      }
+                    `}
+                  >
+                    <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
+                    <span>{tab.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Tab Content */}
+          <div className="p-4 sm:p-6 lg:p-8">
+            <div className="space-y-6">
+              {tabs[activeTab].content.map((item, itemIndex) => (
+                <div key={itemIndex} className="space-y-3">
+                  {item.subtitle && (
+                    <h3 className="text-base sm:text-lg font-semibold text-gray-900">
+                      {item.subtitle}
+                    </h3>
+                  )}
+                  {item.text && (
+                    <p className="text-sm sm:text-base text-gray-700 leading-relaxed">
+                      {item.text}
+                    </p>
+                  )}
+                  {item.steps && (
+                    <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-3 sm:p-4 border border-blue-100">
+                      <ul className="space-y-2">
+                        {item.steps.map((step, stepIndex) => (
+                          <li key={stepIndex} className="text-sm sm:text-base text-gray-700 leading-relaxed">
+                            {step}
+                          </li>
+                        ))}
+                      </ul>
                     </div>
-                    <h2 className="text-2xl font-bold text-gray-900">{section.title}</h2>
-                  </div>
+                  )}
+                  {item.items && (
+                    <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg p-3 sm:p-4 border border-gray-200">
+                      <ul className="space-y-2">
+                        {item.items.filter(Boolean).map((listItem, listIndex) => (
+                          <li key={listIndex} className="text-sm sm:text-base text-gray-700 leading-relaxed">
+                            {listItem}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
-                <div className="p-6">
-                  <div className="space-y-6">
-                    {section.content.map((item, itemIndex) => (
-                      <div key={itemIndex} className="space-y-3">
-                        <h3 className="text-lg font-semibold text-gray-900">
-                          {item.subtitle}
-                        </h3>
-                        <p className="text-gray-700 leading-relaxed">
-                          {item.text}
-                        </p>
-                        {item.steps && (
-                          <div className="bg-gray-50 rounded-lg p-4">
-                            <ul className="space-y-2">
-                              {item.steps.map((step, stepIndex) => (
-                                <li key={stepIndex} className="text-gray-700">
-                                  {step}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                        {item.items && (
-                          <div className="bg-gray-50 rounded-lg p-4">
-                            <ul className="space-y-2">
-                              {item.items.map((listItem, listIndex) => (
-                                <li key={listIndex} className="text-gray-700">
-                                  • {listItem}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+              ))}
+            </div>
+          </div>
         </div>
 
-        {/* Contact Information */}
-        <div className="card-gradient mt-8">
-          <div className="border-b border-gray-200 p-6">
-            <h2 className="text-2xl font-bold text-gray-900">Need More Help?</h2>
-          </div>
-          <div className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-3">Support Contact</h3>
-                <p className="text-gray-700 mb-2">
-                  If you need additional help or have questions about the calculator, please contact:
-                </p>
-                <div className="space-y-1 text-gray-700">
-                  <p><strong>Email:</strong> support@smartcostcalculator.com</p>
-                  <p><strong>Phone:</strong> +27 11 123 4567</p>
-                  <p><strong>Hours:</strong> Monday - Friday, 8:00 AM - 5:00 PM SAST</p>
-                </div>
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-3">Quick Tips</h3>
-                <ul className="space-y-2 text-gray-700">
-                  <li>• Save your work frequently by navigating between sections</li>
-                  <li>• Use the temporary item feature for custom requirements</li>
-                  <li>• Review all calculations before generating final reports</li>
-                  <li>• Check your user role to ensure correct pricing is applied</li>
-                </ul>
-              </div>
-            </div>
+        {/* Support Footer */}
+        <div className="card-gradient">
+          <div className="p-4 sm:p-6">
+            <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3">Need Help?</h3>
+            <p className="text-sm sm:text-base text-gray-700">
+              If you have questions or need assistance, contact your system administrator.
+            </p>
           </div>
         </div>
       </div>

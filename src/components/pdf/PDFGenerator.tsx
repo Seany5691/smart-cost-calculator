@@ -43,7 +43,13 @@ export default function PDFGenerator({ onGenerate, customTotals }: PDFGeneratorP
       setIsGenerating(true);
       
       // Auto-save the deal before generating HTML report
-      const { saveDeal } = useCalculatorStore.getState();
+      const { saveDeal, updateDealDetails } = useCalculatorStore.getState();
+      
+      // If custom totals are provided, save the custom gross profit to deal details
+      if (customTotals) {
+        updateDealDetails({ customGrossProfit: customTotals.totalGrossProfit });
+      }
+      
       await saveDeal();
       
       // Use custom totals if provided, otherwise fall back to calculated totals

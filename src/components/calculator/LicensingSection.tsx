@@ -178,7 +178,7 @@ const LicensingSection = memo(function LicensingSection({ onNext, onPrev }: Lice
           </div>
 
           {/* Mobile Card View - No Horizontal Scroll */}
-          <div className="md:hidden space-y-3">
+          <div className="md:hidden space-y-2">
             {licensingItems.map((item, index) => {
               const cost = getItemCost(item, user?.role || 'user');
               const total = cost * item.quantity;
@@ -186,13 +186,13 @@ const LicensingSection = memo(function LicensingSection({ onNext, onPrev }: Lice
               return (
                 <div 
                   key={item.id}
-                  className="bg-white/60 rounded-lg p-3 border border-white/40 hover:bg-white/80 transition-all duration-300"
+                  className="bg-white/60 rounded-lg p-2 border border-white/40 hover:bg-white/80 transition-all duration-300"
                   style={{ animationDelay: `${index * 0.05}s` }}
                 >
                   {/* License Name and Badges */}
-                  <div className="flex items-start justify-between mb-2">
+                  <div className="flex items-start justify-between mb-1.5">
                     <div className="flex-1">
-                      <div className="font-semibold text-gray-800 text-sm mb-1">{item.name}</div>
+                      <div className="font-semibold text-gray-800 text-sm mb-0.5">{item.name}</div>
                       <div className="flex flex-wrap gap-1">
                         {item.isTemporary && (
                           <Badge variant="purple" className="text-xs">Temp</Badge>
@@ -205,25 +205,25 @@ const LicensingSection = memo(function LicensingSection({ onNext, onPrev }: Lice
                   <div className="grid grid-cols-3 gap-2 items-center">
                     {/* Monthly Cost */}
                     <div className="text-center">
-                      <div className="text-xs text-gray-600 mb-1">Cost/mo</div>
-                      <div className="font-medium text-gray-800 text-sm">{formatCurrency(cost)}</div>
+                      <div className="text-[10px] text-gray-600 mb-0.5">Cost/mo</div>
+                      <div className="font-medium text-gray-800 text-xs">{formatCurrency(cost)}</div>
                     </div>
 
                     {/* Quantity Controls */}
                     <div className="text-center">
-                      <div className="text-xs text-gray-600 mb-1">Qty</div>
+                      <div className="text-[10px] text-gray-600 mb-0.5">Qty</div>
                       <div className="flex items-center justify-center space-x-1">
                         <button
                           onClick={() => handleQuantityChange(item.id, item.quantity - 1)}
                           disabled={item.quantity <= 0}
-                          className="p-1.5 h-7 w-7 rounded-lg bg-white hover:bg-gray-50 border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95 flex items-center justify-center touch-manipulation"
+                          className="p-0.5 h-6 w-6 rounded-md bg-white hover:bg-gray-50 border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95 flex items-center justify-center touch-manipulation"
                         >
                           <Minus className="w-3 h-3 text-red-600" />
                         </button>
-                        <span className="w-8 text-center font-bold text-gray-800">{item.quantity}</span>
+                        <span className="w-7 text-center font-bold text-gray-800 text-sm">{item.quantity}</span>
                         <button
                           onClick={() => handleQuantityChange(item.id, item.quantity + 1)}
-                          className="p-1.5 h-7 w-7 rounded-lg bg-white hover:bg-gray-50 border border-gray-300 transition-all active:scale-95 flex items-center justify-center touch-manipulation"
+                          className="p-0.5 h-6 w-6 rounded-md bg-white hover:bg-gray-50 border border-gray-300 transition-all active:scale-95 flex items-center justify-center touch-manipulation"
                         >
                           <Plus className="w-3 h-3 text-green-600" />
                         </button>
@@ -232,8 +232,8 @@ const LicensingSection = memo(function LicensingSection({ onNext, onPrev }: Lice
 
                     {/* Total */}
                     <div className="text-center">
-                      <div className="text-xs text-gray-600 mb-1">Total</div>
-                      <div className="font-bold text-sm bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+                      <div className="text-[10px] text-gray-600 mb-0.5">Total</div>
+                      <div className="font-bold text-xs bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
                         {formatCurrency(total)}
                       </div>
                     </div>

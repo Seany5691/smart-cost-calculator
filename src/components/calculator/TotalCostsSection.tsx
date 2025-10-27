@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef, memo } from 'react';
-import { useCalculatorDealDetails, useCalculateTotalCosts, useSaveDeal } from '@/store/calculator';
+import { useCalculatorDealDetails, useCalculateTotalCosts, useSaveDeal, useCalculatorStore } from '@/store/calculator';
 import { useAuthUser } from '@/store/auth';
 import { useConfigScales, useConfigFactors } from '@/store/config';
 import { formatCurrency, getFactorForDeal } from '@/lib/utils';
@@ -216,6 +216,12 @@ const TotalCostsSection = memo(function TotalCostsSection({ onPrev }: TotalCosts
     return baseTotals;
   }, [calculateTotalCosts, scales, factors, dealDetails, user?.role, getScaleCost]);
 
+  // Initialize editable gross profit from deal details when component mounts or deal changes
+  useEffect(() => {
+    // Set the editable gross profit from deal details (could be null/undefined for default)
+    setEditableTotalGrossProfit(dealDetails.customGrossProfit ?? null);
+  }, [dealDetails.customGrossProfit]);
+
   // Calculate totals when component mounts or dependencies change
   useEffect(() => {
     const calculatedTotals = calculateTotalsWithCustomGrossProfit(editableTotalGrossProfit);
@@ -225,13 +231,17 @@ const TotalCostsSection = memo(function TotalCostsSection({ onPrev }: TotalCosts
   const handleGenerateProposal = useCallback(async () => {
     // Auto-save the deal before generating proposal
     try {
+      // Save the custom gross profit to deal details before saving
+      const updateDealDetails = useCalculatorStore.getState().updateDealDetails;
+      updateDealDetails({ customGrossProfit: editableTotalGrossProfit });
+      
       await saveDeal();
     } catch (error) {
       console.error('Error auto-saving deal:', error);
     }
     
     setIsProposalModalOpen(true);
-  }, [saveDeal]);
+  }, [saveDeal, editableTotalGrossProfit]);
 
   const handleProposalGenerate = useCallback((proposalData: ProposalData) => {
     setIsProposalModalOpen(false);
@@ -250,6 +260,10 @@ const TotalCostsSection = memo(function TotalCostsSection({ onPrev }: TotalCosts
     setSaveMessage(null);
 
     try {
+      // Save the custom gross profit to deal details before saving
+      const updateDealDetails = useCalculatorStore.getState().updateDealDetails;
+      updateDealDetails({ customGrossProfit: editableTotalGrossProfit });
+      
       const success = await saveDeal();
       if (success) {
         setSaveMessage({ type: 'success', text: 'Deal saved successfully!' });
@@ -261,7 +275,7 @@ const TotalCostsSection = memo(function TotalCostsSection({ onPrev }: TotalCosts
     } finally {
       setIsSaving(false);
     }
-  }, [saveDeal]);
+  }, [saveDeal, editableTotalGrossProfit]);
 
   const handleGrossProfitChange = useCallback((value: number) => {
     // Ensure the value is a valid number

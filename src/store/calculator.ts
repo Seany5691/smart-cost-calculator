@@ -122,7 +122,8 @@ export const useCalculatorStore = create<CalculatorState>()(
               term: dealDetails.term,
               escalation: dealDetails.escalation,
               distanceToInstall: dealDetails.distanceToInstall,
-              settlement: dealDetails.settlement
+              settlement: dealDetails.settlement,
+              customGrossProfit: dealDetails.customGrossProfit
             },
             sectionsData: sections,
             totalsData: totals,
@@ -194,6 +195,7 @@ export const useCalculatorStore = create<CalculatorState>()(
                   escalation: dealDetails.escalation,
                   distanceToInstall: dealDetails.distanceToInstall,
                   settlement: dealDetails.settlement,
+                  customGrossProfit: dealDetails.customGrossProfit,
                   sections,
                   factors: configStore.factors,
                   scales: configStore.scales,
@@ -221,6 +223,7 @@ export const useCalculatorStore = create<CalculatorState>()(
               escalation: dealDetails.escalation,
               distanceToInstall: dealDetails.distanceToInstall,
               settlement: dealDetails.settlement,
+              customGrossProfit: dealDetails.customGrossProfit,
               sections,
               factors: configStore.factors,
               scales: configStore.scales,
@@ -277,7 +280,8 @@ export const useCalculatorStore = create<CalculatorState>()(
             term: deal.term,
             escalation: deal.escalation,
             distanceToInstall: deal.distanceToInstall,
-            settlement: deal.settlement
+            settlement: deal.settlement,
+            customGrossProfit: deal.customGrossProfit
           };
           
           set((state) => ({
@@ -556,9 +560,13 @@ export const useCalculatorStore = create<CalculatorState>()(
           }
         }
 
-        // Get gross profit based on extension count
+        // Get gross profit based on extension count or use custom gross profit if set
         let baseGrossProfit = 0;
-        if (configStore.scales?.gross_profit) {
+        
+        // Check if custom gross profit is set in deal details
+        if (dealDetails.customGrossProfit !== null && dealDetails.customGrossProfit !== undefined) {
+          baseGrossProfit = dealDetails.customGrossProfit;
+        } else if (configStore.scales?.gross_profit) {
           // First get the correct role-based data
           const grossProfitData = getScaleCost(configStore.scales.gross_profit, userRole);
           
