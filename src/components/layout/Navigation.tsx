@@ -31,10 +31,10 @@ export default function Navigation() {
     { name: 'Dashboard', href: '/', icon: Home },
     { name: 'Calculator', href: '/calculator', icon: Calculator },
     { name: 'My Deals', href: '/my-deals', icon: FileText },
-    { name: 'Documentation', href: '/documentation', icon: BookOpen },
     ...(user?.role === 'admin' || user?.role === 'manager' ? [
       { name: 'Smart Scraper', href: '/scraper', icon: Search },
     ] : []),
+    { name: 'Instructions', href: '/documentation', icon: BookOpen },
     ...(user?.role === 'admin' ? [
       { name: 'Admin', href: '/admin', icon: Settings },
     ] : []),

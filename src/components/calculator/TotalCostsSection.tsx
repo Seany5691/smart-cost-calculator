@@ -464,13 +464,13 @@ const TotalCostsSection = memo(function TotalCostsSection({ onPrev }: TotalCosts
 
       {/* Total Gross Profit Card */}
       <GlassCard className="animate-slide-up bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200" style={{ animationDelay: '0.2s' }}>
-        <div className="border-b border-gray-200 pb-4 mb-6">
+        <div className="border-b border-gray-200 pb-4 mb-6 px-4 sm:px-6 pt-4 sm:pt-6">
           <h3 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
             <DollarSign className="w-5 h-5 text-purple-600" />
             Total Gross Profit
           </h3>
         </div>
-        <div>
+        <div className="px-4 sm:px-6 pb-4 sm:pb-6">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
               <p className="text-sm text-gray-700 mb-2">Adjust the total gross profit for this deal</p>
@@ -505,13 +505,13 @@ const TotalCostsSection = memo(function TotalCostsSection({ onPrev }: TotalCosts
 
       {/* Deal Information */}
       <GlassCard className="animate-slide-up" style={{ animationDelay: '0.3s' }}>
-        <div className="border-b border-gray-200 pb-4 mb-6">
+        <div className="border-b border-gray-200 pb-4 mb-6 px-4 sm:px-6 pt-4 sm:pt-6">
           <h3 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
             <Info className="w-5 h-5 text-cyan-600" />
             Deal Information
           </h3>
         </div>
-        <div>
+        <div className="px-4 sm:px-6 pb-4 sm:pb-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <div className="glass-effect p-4 rounded-xl border border-gray-200 bg-white/60">
               <p className="font-semibold text-gray-600 text-xs uppercase tracking-wider mb-1">Customer Name</p>
@@ -539,7 +539,7 @@ const TotalCostsSection = memo(function TotalCostsSection({ onPrev }: TotalCosts
 
       {/* Pricing Information */}
       <GlassCard className="bg-gradient-to-r from-blue-50 to-cyan-50 border-blue-200 animate-glow" style={{ animationDelay: '0.4s' }}>
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 p-4 sm:p-6">
           <div>
             <h4 className="font-semibold text-gray-900 flex items-center gap-2">
               <Zap className="w-5 h-5 text-blue-600" />
@@ -563,7 +563,7 @@ const TotalCostsSection = memo(function TotalCostsSection({ onPrev }: TotalCosts
             ? 'bg-gradient-to-r from-green-100 to-emerald-100 border-green-300' 
             : 'bg-gradient-to-r from-red-100 to-rose-100 border-red-300'
         }`}>
-          <p className={saveMessage.type === 'success' ? 'text-green-800' : 'text-red-800'}>
+          <p className={`p-4 sm:p-6 ${saveMessage.type === 'success' ? 'text-green-800' : 'text-red-800'}`}>
             {saveMessage.text}
           </p>
         </GlassCard>
