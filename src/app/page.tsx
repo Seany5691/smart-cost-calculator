@@ -7,11 +7,14 @@ import Link from 'next/link';
 import { Calculator, Settings, FileText, Users, ArrowRight, Clock, FolderOpen, Sparkles, TrendingUp, Search } from 'lucide-react';
 import { AnimatedBackground, GlassCard, GradientText, StatCard } from '@/components/ui/modern';
 import ActivityTimeline from '@/components/dashboard/ActivityTimeline';
-import { getTotalDealsAsync, getActiveProjectsAsync, getTotalCalculationsAsync } from '@/lib/dashboardStats';
+import { getDashboardStatsOptimized } from '@/lib/dashboardStats';
+import { useIsMobile } from '@/hooks/useIsMobile';
+import { StatCardSkeleton } from '@/components/ui/skeletons';
 
 export default function DashboardPage() {
   const { user, checkAuth } = useAuthStore();
   const router = useRouter();
+  const { isMobile } = useIsMobile();
   const [stats, setStats] = useState({
     totalDeals: 0,
     activeProjects: 0,
@@ -31,17 +34,10 @@ export default function DashboardPage() {
         setIsLoadingStats(true);
         try {
           const isAdmin = user.role === 'admin';
-          const [totalDeals, activeProjects, calculations] = await Promise.all([
-            getTotalDealsAsync(user.id, isAdmin),
-            getActiveProjectsAsync(user.id, isAdmin),
-            getTotalCalculationsAsync(user.id, isAdmin)
-          ]);
+          // Use optimized query for mobile devices
+          const statsData = await getDashboardStatsOptimized(user.id, isAdmin, isMobile);
           
-          setStats({
-            totalDeals,
-            activeProjects,
-            calculations
-          });
+          setStats(statsData);
         } catch (error) {
           console.error('Failed to load dashboard statistics:', error);
         } finally {
@@ -51,7 +47,7 @@ export default function DashboardPage() {
     };
 
     loadStats();
-  }, [user]);
+  }, [user, isMobile]);
 
   if (!user) {
     return null;
@@ -117,7 +113,7 @@ export default function DashboardPage() {
   return (
     <div className="container mx-auto px-4 py-8 relative">
       {/* Animated Background */}
-      <AnimatedBackground />
+      <AnimatedBackground isMobile={isMobile} />
       
       {/* Welcome Section */}
       <div className="mb-8 animate-fade-in-up relative z-10">
@@ -143,7 +139,7 @@ export default function DashboardPage() {
               key={index}
               href={action.href}
               className="block animate-fade-in-up"
-              style={{ animationDelay: `${0.1 + index * 0.1}s` }}
+              style={!isMobile ? { animationDelay: `${0.1 + index * 0.1}s` } : undefined}
             >
               <GlassCard className="h-full p-6">
                 <div className="flex items-start space-x-4">
@@ -168,37 +164,47 @@ export default function DashboardPage() {
 
       {/* Stats Overview */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 relative z-10">
-        <StatCard
-          label="Total Deals"
-          value={stats.totalDeals}
-          icon={FileText}
-          trend={0}
-          animated
-          className="animate-fade-in-up"
-          style={{ animationDelay: '0.7s' } as React.CSSProperties}
-        />
-        <StatCard
-          label="Active Projects"
-          value={stats.activeProjects}
-          icon={TrendingUp}
-          trend={0}
-          animated
-          className="animate-fade-in-up"
-          style={{ animationDelay: '0.8s' } as React.CSSProperties}
-        />
-        <StatCard
-          label="Calculations"
-          value={stats.calculations}
-          icon={Calculator}
-          trend={0}
-          animated
-          className="animate-fade-in-up"
-          style={{ animationDelay: '0.9s' } as React.CSSProperties}
-        />
+        {isLoadingStats ? (
+          <>
+            <StatCardSkeleton isMobile={isMobile} />
+            <StatCardSkeleton isMobile={isMobile} />
+            <StatCardSkeleton isMobile={isMobile} />
+          </>
+        ) : (
+          <>
+            <StatCard
+              label="Total Deals"
+              value={stats.totalDeals}
+              icon={FileText}
+              trend={0}
+              animated
+              className="animate-fade-in-up"
+              style={!isMobile ? ({ animationDelay: '0.7s' } as React.CSSProperties) : undefined}
+            />
+            <StatCard
+              label="Active Projects"
+              value={stats.activeProjects}
+              icon={TrendingUp}
+              trend={0}
+              animated
+              className="animate-fade-in-up"
+              style={!isMobile ? ({ animationDelay: '0.8s' } as React.CSSProperties) : undefined}
+            />
+            <StatCard
+              label="Calculations"
+              value={stats.calculations}
+              icon={Calculator}
+              trend={0}
+              animated
+              className="animate-fade-in-up"
+              style={!isMobile ? ({ animationDelay: '0.9s' } as React.CSSProperties) : undefined}
+            />
+          </>
+        )}
       </div>
 
       {/* Recent Activity Section */}
-      <div className="mt-8 relative z-10 animate-fade-in-up" style={{ animationDelay: '1.0s' }}>
+      <div className="mt-8 relative z-10 animate-fade-in-up" style={!isMobile ? { animationDelay: '1.0s' } : undefined}>
         <div className="flex items-center space-x-2 mb-4">
           <Clock className="w-5 h-5 text-purple-500 animate-pulse" />
           <h2 className="text-2xl font-semibold">
@@ -209,7 +215,8 @@ export default function DashboardPage() {
         <GlassCard className="p-6">
           <ActivityTimeline 
             userRole={user.role as 'admin' | 'manager' | 'user'} 
-            currentUserId={user.id} 
+            currentUserId={user.id}
+            isMobile={isMobile}
           />
         </GlassCard>
       </div>

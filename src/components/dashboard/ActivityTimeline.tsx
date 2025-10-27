@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   FileText, 
   Save, 
@@ -14,10 +14,13 @@ import {
 import { getActivityLogs, getUniqueUsers, ActivityLog, ActivityType } from '@/lib/activityLogger';
 import { supabaseHelpers } from '@/lib/supabase';
 import { useAuthStore } from '@/store/auth';
+import { ActivityCardSkeleton } from '@/components/ui/skeletons';
+import { debounce } from '@/lib/utils/debounce';
 
 interface ActivityTimelineProps {
   userRole: 'admin' | 'manager' | 'user';
   currentUserId: string;
+  isMobile?: boolean;
 }
 
 // Activity type to icon mapping
@@ -72,59 +75,103 @@ const formatRelativeTime = (timestamp: string): string => {
   }
 };
 
-export default function ActivityTimeline({ userRole, currentUserId }: ActivityTimelineProps) {
+export default function ActivityTimeline({ userRole, currentUserId, isMobile = false }: ActivityTimelineProps) {
   const [activities, setActivities] = useState<ActivityLog[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string>('all');
   const [availableUsers, setAvailableUsers] = useState<Array<{ userId: string; username: string; userRole: string }>>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const { users } = useAuthStore();
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const observerRef = useRef<IntersectionObserver | null>(null);
+  const loadMoreTriggerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    // Load activities based on role and selected user
-    const loadActivities = async () => {
+  // Determine page size based on device type
+  const pageSize = isMobile ? 20 : 50;
+
+  // Load initial activities
+  const loadActivities = useCallback(async (resetPage: boolean = false) => {
+    const targetPage = resetPage ? 1 : currentPage;
+    
+    if (resetPage) {
       setIsLoading(true);
-      setError(null);
-      
-      try {
-        let logs: ActivityLog[];
-        
-        if (userRole === 'admin') {
-          if (selectedUserId === 'all') {
-            // Admin viewing all users - fetch from Supabase
-            logs = await supabaseHelpers.getActivityLogs();
-          } else {
-            // Admin viewing specific user - fetch from Supabase with filter
-            logs = await supabaseHelpers.getActivityLogs(selectedUserId);
-          }
-        } else {
-          // Non-admin users only see their own activities - fetch from Supabase
-          logs = await supabaseHelpers.getActivityLogs(currentUserId);
-        }
-        
-        setActivities(logs);
-      } catch (err) {
-        console.error('Failed to load activities from Supabase, falling back to localStorage:', err);
-        setError('Unable to load activities from server. Showing local data.');
-        
-        // Fall back to localStorage
-        let logs: ActivityLog[];
-        if (userRole === 'admin') {
-          if (selectedUserId === 'all') {
-            logs = getActivityLogs();
-          } else {
-            logs = getActivityLogs(selectedUserId);
-          }
-        } else {
-          logs = getActivityLogs(currentUserId);
-        }
-        setActivities(logs);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+      setActivities([]);
+      setCurrentPage(1);
+      setHasMore(true);
+    } else {
+      setIsLoadingMore(true);
+    }
+    
+    setError(null);
+    
+    try {
+      const filterUserId = userRole === 'admin' && selectedUserId !== 'all' 
+        ? selectedUserId 
+        : userRole !== 'admin' 
+        ? currentUserId 
+        : undefined;
 
-    loadActivities();
+      const result = await supabaseHelpers.getActivityLogsPaginated(
+        filterUserId,
+        targetPage,
+        pageSize
+      );
+      
+      if (resetPage) {
+        setActivities(result.data);
+      } else {
+        setActivities(prev => [...prev, ...result.data]);
+      }
+      
+      setHasMore(result.hasMore);
+      
+      if (!resetPage) {
+        setCurrentPage(prev => prev + 1);
+      }
+    } catch (err) {
+      console.error('Failed to load activities from Supabase, falling back to localStorage:', err);
+      setError('Unable to load activities from server. Showing local data.');
+      
+      // Fall back to localStorage
+      let logs: ActivityLog[];
+      if (userRole === 'admin') {
+        if (selectedUserId === 'all') {
+          logs = getActivityLogs();
+        } else {
+          logs = getActivityLogs(selectedUserId);
+        }
+      } else {
+        logs = getActivityLogs(currentUserId);
+      }
+      
+      // Apply pagination to localStorage data
+      const start = (targetPage - 1) * pageSize;
+      const end = start + pageSize;
+      const paginatedLogs = logs.slice(start, end);
+      
+      if (resetPage) {
+        setActivities(paginatedLogs);
+      } else {
+        setActivities(prev => [...prev, ...paginatedLogs]);
+      }
+      
+      setHasMore(end < logs.length);
+      
+      if (!resetPage) {
+        setCurrentPage(prev => prev + 1);
+      }
+    } finally {
+      setIsLoading(false);
+      setIsLoadingMore(false);
+    }
+  }, [userRole, currentUserId, selectedUserId, currentPage, pageSize]);
+
+  // Initial load and reload on filter change
+  useEffect(() => {
+    loadActivities(true);
   }, [userRole, currentUserId, selectedUserId]);
 
   useEffect(() => {
@@ -134,6 +181,43 @@ export default function ActivityTimeline({ userRole, currentUserId }: ActivityTi
       setAvailableUsers(uniqueUsers);
     }
   }, [userRole]);
+
+  // Infinite scroll with Intersection Observer
+  useEffect(() => {
+    if (!loadMoreTriggerRef.current || !hasMore || isLoadingMore) {
+      return;
+    }
+
+    // Debounced load more function
+    const debouncedLoadMore = debounce(() => {
+      if (hasMore && !isLoadingMore) {
+        loadActivities(false);
+      }
+    }, 100);
+
+    // Create intersection observer
+    observerRef.current = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries;
+        if (entry.isIntersecting) {
+          debouncedLoadMore();
+        }
+      },
+      {
+        root: null,
+        rootMargin: '100px', // Trigger 100px before reaching the element
+        threshold: 0.1
+      }
+    );
+
+    observerRef.current.observe(loadMoreTriggerRef.current);
+
+    return () => {
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+      }
+    };
+  }, [hasMore, isLoadingMore, loadActivities]);
 
   return (
     <div className="space-y-4">
@@ -171,11 +255,10 @@ export default function ActivityTimeline({ userRole, currentUserId }: ActivityTi
 
       {/* Loading State */}
       {isLoading ? (
-        <div className="text-center py-12">
-          <div className="inline-flex p-4 bg-gradient-to-br from-blue-100 to-purple-100 rounded-2xl mb-4">
-            <Loader2 className="w-12 h-12 text-blue-500 animate-spin" />
-          </div>
-          <p className="text-gray-500 text-lg">Loading activities...</p>
+        <div className="space-y-3">
+          {Array.from({ length: 5 }).map((_, index) => (
+            <ActivityCardSkeleton key={index} isMobile={isMobile} />
+          ))}
         </div>
       ) : activities.length === 0 ? (
         <div className="text-center py-12">
@@ -190,7 +273,7 @@ export default function ActivityTimeline({ userRole, currentUserId }: ActivityTi
           </p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-3" ref={scrollContainerRef}>
           {activities.map((activity) => {
             const Icon = activityIcons[activity.activityType];
             const colorClasses = activityColors[activity.activityType];
@@ -230,6 +313,25 @@ export default function ActivityTimeline({ userRole, currentUserId }: ActivityTi
               </div>
             );
           })}
+
+          {/* Infinite scroll trigger */}
+          {hasMore && (
+            <div ref={loadMoreTriggerRef} className="py-4">
+              {isLoadingMore && (
+                <div className="flex items-center justify-center space-x-2">
+                  <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />
+                  <span className="text-sm text-gray-500">Loading more activities...</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* No more activities message */}
+          {!hasMore && activities.length > 0 && (
+            <div className="text-center py-4">
+              <p className="text-sm text-gray-500">No more activities to load</p>
+            </div>
+          )}
         </div>
       )}
     </div>

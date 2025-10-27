@@ -362,6 +362,40 @@ export const supabaseHelpers = {
     }
   },
 
+  async getActivityLogsPaginated(userId?: string, page: number = 1, pageSize: number = 20) {
+    try {
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
+
+      let query = supabase
+        .from('activity_logs')
+        .select('*', { count: 'exact' })
+        .order('timestamp', { ascending: false })
+        .range(from, to);
+
+      if (userId) {
+        query = query.eq('userId', userId);
+      }
+
+      const { data, error, count } = await query;
+      if (error) throw error;
+
+      const totalCount = count || 0;
+      const hasMore = to < totalCount - 1;
+
+      return {
+        data: data || [],
+        hasMore,
+        totalCount,
+        page,
+        pageSize
+      };
+    } catch (error) {
+      console.warn('Failed to retrieve paginated activity logs from Supabase:', error);
+      throw error;
+    }
+  },
+
   async createActivityLog(log: any) {
     try {
       const { data, error } = await supabase
