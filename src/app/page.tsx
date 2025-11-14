@@ -79,6 +79,14 @@ export default function DashboardPage() {
       textColor: 'text-teal-500'
     }] : []),
     {
+      title: 'Leads Manager',
+      description: 'Manage your lead pipeline and routes',
+      icon: Users,
+      href: '/leads',
+      color: 'bg-cyan-500',
+      textColor: 'text-cyan-500'
+    },
+    {
       title: 'Instructions',
       description: 'View user guides and help',
       icon: FileText,

@@ -13,7 +13,8 @@ import {
   Home,
   FileText,
   BookOpen,
-  Search
+  Search,
+  Users
 } from 'lucide-react';
 
 export default function Navigation() {
@@ -34,6 +35,7 @@ export default function Navigation() {
     ...(user?.role === 'admin' || user?.role === 'manager' ? [
       { name: 'Smart Scraper', href: '/scraper', icon: Search },
     ] : []),
+    { name: 'Leads Manager', href: '/leads', icon: Users },
     { name: 'Instructions', href: '/documentation', icon: BookOpen },
     ...(user?.role === 'admin' ? [
       { name: 'Admin', href: '/admin', icon: Settings },

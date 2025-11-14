@@ -1,0 +1,389 @@
+import { create } from 'zustand';
+import { 
+  Lead, 
+  LeadStatus, 
+  LeadFormData, 
+  LeadSearchFilters,
+  LeadBulkActionResult,
+  PROVIDER_PRIORITY
+} from '@/lib/leads/types';
+import { useAuthStore } from '@/store/auth';
+import { supabaseLeads } from '@/lib/leads/supabaseLeads';
+
+interface LeadsState {
+  leads: Lead[];
+  workingLeads: Lead[];
+  selectedLeads: string[];
+  isLoading: boolean;
+  error: string | null;
+  realtimeSubscription: any;
+  
+  // Actions
+  fetchLeads: (filters?: LeadSearchFilters) => Promise<void>;
+  fetchLeadsByStatus: (status: LeadStatus) => Promise<void>;
+  createLead: (leadData: LeadFormData) => Promise<Lead>;
+  updateLead: (leadId: string, updates: Partial<Lead>) => Promise<Lead>;
+  deleteLead: (leadId: string) => Promise<void>;
+  bulkUpdateLeads: (leadIds: string[], updates: Partial<Lead>) => Promise<LeadBulkActionResult>;
+  changeLeadStatus: (leadId: string, status: LeadStatus, additionalData?: any) => Promise<void>;
+  selectLead: (leadId: string) => void;
+  deselectLead: (leadId: string) => void;
+  clearSelection: () => void;
+  searchLeads: (filters: LeadSearchFilters) => Promise<void>;
+  renumberLeads: (status: LeadStatus) => Promise<void>;
+  sortLeads: (leads: Lead[]) => Lead[];
+  getUniqueListNames: () => Promise<string[]>;
+  deleteList: (listName: string) => Promise<{ deletedCount: number }>;
+  subscribeToLeads: () => void;
+  unsubscribeFromLeads: () => void;
+}
+
+export const useLeadsStore = create<LeadsState>((set, get) => ({
+  leads: [],
+  workingLeads: [],
+  selectedLeads: [],
+  isLoading: false,
+  error: null,
+  realtimeSubscription: null,
+
+  // Fetch all leads with optional filters
+  fetchLeads: async (filters?: LeadSearchFilters) => {
+    set({ isLoading: true, error: null });
+    try {
+      const user = useAuthStore.getState().user;
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
+      // Get leads from Supabase
+      const leads = await supabaseLeads.getLeads(user.id, filters);
+
+      // Sort leads by provider priority and number
+      const sortedLeads = get().sortLeads(leads);
+      
+      set({ 
+        leads: sortedLeads, 
+        isLoading: false 
+      });
+    } catch (error: any) {
+      set({ 
+        error: error.message || 'Failed to fetch leads', 
+        isLoading: false 
+      });
+      throw error;
+    }
+  },
+
+  // Fetch leads by specific status
+  fetchLeadsByStatus: async (status: LeadStatus) => {
+    set({ isLoading: true, error: null });
+    try {
+      const user = useAuthStore.getState().user;
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
+      const leads = await supabaseLeads.getLeadsByStatus(user.id, status);
+      const sortedLeads = get().sortLeads(leads);
+      
+      set({ 
+        leads: sortedLeads, 
+        isLoading: false 
+      });
+    } catch (error: any) {
+      set({ 
+        error: error.message || 'Failed to fetch leads by status', 
+        isLoading: false 
+      });
+      throw error;
+    }
+  },
+
+  // Create a new lead
+  createLead: async (leadData: LeadFormData) => {
+    set({ isLoading: true, error: null });
+    try {
+      const user = useAuthStore.getState().user;
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
+      const newLead: Partial<Lead> = {
+        maps_address: leadData.maps_address,
+        name: leadData.name,
+        phone: leadData.phone || null,
+        provider: leadData.provider || null,
+        address: leadData.address || null,
+        type_of_business: leadData.type_of_business || null,
+        status: leadData.status || 'new',
+        notes: leadData.notes || null,
+        date_to_call_back: leadData.date_to_call_back || null,
+        coordinates: null,
+        background_color: null,
+        import_session_id: null,
+      };
+
+      // Create in Supabase
+      const createdLead = await supabaseLeads.createLead(user.id, newLead);
+
+      // Add to local state
+      const currentLeads = get().leads;
+      const updatedLeads = get().sortLeads([...currentLeads, createdLead]);
+      
+      set({ 
+        leads: updatedLeads, 
+        isLoading: false 
+      });
+
+      return createdLead;
+    } catch (error: any) {
+      set({ 
+        error: error.message || 'Failed to create lead', 
+        isLoading: false 
+      });
+      throw error;
+    }
+  },
+
+  // Update an existing lead
+  updateLead: async (leadId: string, updates: Partial<Lead>) => {
+    set({ isLoading: true, error: null });
+    try {
+      const user = useAuthStore.getState().user;
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
+      // Update in Supabase
+      const updatedLead = await supabaseLeads.updateLead(user.id, leadId, updates);
+
+      // Update local state
+      const currentLeads = get().leads;
+      const updatedLeads = currentLeads.map(lead => 
+        lead.id === leadId ? updatedLead : lead
+      );
+      const sortedLeads = get().sortLeads(updatedLeads);
+      
+      set({ 
+        leads: sortedLeads, 
+        isLoading: false 
+      });
+
+      return updatedLead;
+    } catch (error: any) {
+      set({ 
+        error: error.message || 'Failed to update lead', 
+        isLoading: false 
+      });
+      throw error;
+    }
+  },
+
+  // Delete a lead
+  deleteLead: async (leadId: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      const user = useAuthStore.getState().user;
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
+      // Delete from Supabase
+      await supabaseLeads.deleteLead(user.id, leadId);
+
+      // Remove from local state
+      const currentLeads = get().leads;
+      const updatedLeads = currentLeads.filter(lead => lead.id !== leadId);
+      
+      set({ 
+        leads: updatedLeads, 
+        selectedLeads: get().selectedLeads.filter(id => id !== leadId),
+        isLoading: false 
+      });
+    } catch (error: any) {
+      set({ 
+        error: error.message || 'Failed to delete lead', 
+        isLoading: false 
+      });
+      throw error;
+    }
+  },
+
+  // Bulk update multiple leads
+  bulkUpdateLeads: async (leadIds: string[], updates: Partial<Lead>) => {
+    set({ isLoading: true, error: null });
+    try {
+      const user = useAuthStore.getState().user;
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
+      // Bulk update in Supabase
+      const results = await supabaseLeads.bulkUpdateLeads(user.id, leadIds, updates);
+
+      // Refresh leads after bulk update
+      await get().fetchLeads();
+      
+      set({ isLoading: false });
+      return results;
+    } catch (error: any) {
+      set({ 
+        error: error.message || 'Failed to bulk update leads', 
+        isLoading: false 
+      });
+      throw error;
+    }
+  },
+
+  // Change lead status with automatic renumbering
+  changeLeadStatus: async (leadId: string, status: LeadStatus, additionalData?: any) => {
+    set({ isLoading: true, error: null });
+    try {
+      const user = useAuthStore.getState().user;
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
+      // If moving to "later" status, ensure date_to_call_back is set
+      if (status === 'later' && !additionalData?.date_to_call_back) {
+        throw new Error('Date to call back is required for Later Stage status');
+      }
+
+      // Change status in Supabase (handles renumbering automatically)
+      await supabaseLeads.changeLeadStatus(user.id, leadId, status, additionalData);
+
+      // Refresh leads
+      await get().fetchLeads();
+      
+      set({ isLoading: false });
+    } catch (error: any) {
+      set({ 
+        error: error.message || 'Failed to change lead status', 
+        isLoading: false 
+      });
+      throw error;
+    }
+  },
+
+  // Select a lead for bulk actions
+  selectLead: (leadId: string) => {
+    const currentSelection = get().selectedLeads;
+    if (!currentSelection.includes(leadId)) {
+      set({ selectedLeads: [...currentSelection, leadId] });
+    }
+  },
+
+  // Deselect a lead
+  deselectLead: (leadId: string) => {
+    const currentSelection = get().selectedLeads;
+    set({ selectedLeads: currentSelection.filter(id => id !== leadId) });
+  },
+
+  // Clear all selections
+  clearSelection: () => {
+    set({ selectedLeads: [] });
+  },
+
+  // Search leads with filters
+  searchLeads: async (filters: LeadSearchFilters) => {
+    // Just use fetchLeads with filters
+    await get().fetchLeads(filters);
+  },
+
+  // Renumber leads in a specific status category
+  renumberLeads: async (status: LeadStatus) => {
+    set({ isLoading: true, error: null });
+    try {
+      const user = useAuthStore.getState().user;
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
+      // Renumber in Supabase
+      await supabaseLeads.renumberLeads(user.id, status);
+      
+      // Refresh leads after renumbering
+      await get().fetchLeads();
+      
+      set({ isLoading: false });
+    } catch (error: any) {
+      set({ 
+        error: error.message || 'Failed to renumber leads', 
+        isLoading: false 
+      });
+      throw error;
+    }
+  },
+
+  // Sort leads by provider priority and number
+  sortLeads: (leads: Lead[]) => {
+    return [...leads].sort((a, b) => {
+      // First sort by provider priority (Telkom first)
+      const providerA = a.provider || 'Other';
+      const providerB = b.provider || 'Other';
+      const priorityA = PROVIDER_PRIORITY[providerA] || PROVIDER_PRIORITY['Other'];
+      const priorityB = PROVIDER_PRIORITY[providerB] || PROVIDER_PRIORITY['Other'];
+      
+      if (priorityA !== priorityB) {
+        return priorityA - priorityB;
+      }
+      
+      // Then sort by number
+      return a.number - b.number;
+    });
+  },
+
+  // Get all unique list names from leads
+  getUniqueListNames: async () => {
+    const user = useAuthStore.getState().user;
+    if (!user) {
+      return [];
+    }
+    
+    return await supabaseLeads.getUniqueListNames(user.id);
+  },
+
+  // Delete an entire list
+  deleteList: async (listName: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      const user = useAuthStore.getState().user;
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
+      // Delete the list from Supabase
+      const result = await supabaseLeads.deleteList(user.id, listName);
+
+      // Refresh leads after deletion
+      await get().fetchLeads();
+      
+      set({ isLoading: false });
+      return result;
+    } catch (error: any) {
+      set({ 
+        error: error.message || 'Failed to delete list', 
+        isLoading: false 
+      });
+      throw error;
+    }
+  },
+
+  // Subscribe to real-time lead updates (no-op for localStorage)
+  subscribeToLeads: () => {
+    // No-op for localStorage implementation
+    // Real-time updates will be handled by the main app when integrated
+  },
+
+  // Unsubscribe from real-time updates (no-op for localStorage)
+  unsubscribeFromLeads: () => {
+    // No-op for localStorage implementation
+  }
+}));
+
+// Convenience selectors
+export const useLeads = () => useLeadsStore((state) => state.leads);
+export const useWorkingLeads = () => useLeadsStore((state) => state.workingLeads);
+export const useSelectedLeads = () => useLeadsStore((state) => state.selectedLeads);
+export const useLeadsLoading = () => useLeadsStore((state) => state.isLoading);
+export const useLeadsError = () => useLeadsStore((state) => state.error);

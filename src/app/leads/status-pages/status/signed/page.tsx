@@ -1,0 +1,550 @@
+'use client';
+
+import { useEffect, useState, useMemo } from 'react';
+import { useLeadsStore } from '@/store/leads/leads';
+import { LeadCard } from '@/components/leads/leads/LeadCard';
+import { Lead, LeadSortOptions } from '@/lib/leads/types';
+import { Card } from '@/components/leads/ui/Card';
+import { 
+  Search, 
+  Download, 
+  Grid, 
+  List as ListIcon,
+  CheckCircle,
+  TrendingUp,
+  Award,
+  DollarSign,
+  Calendar,
+  Phone,
+  MapPin,
+  Building2
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { LeadNotesRemindersDropdown } from '@/components/leads/leads/LeadNotesRemindersDropdown';
+import { LeadFilesButton } from '@/components/leads/leads/LeadFilesButton';
+import { AddLeadButton } from '@/components/leads/leads/AddLeadButton';
+import { StatusManager } from '@/components/leads/leads/StatusManager';
+
+export default function SignedLeadsPage() {
+  const {
+    leads,
+    isLoading,
+    error,
+    fetchLeadsByStatus,
+    selectLead,
+    deselectLead,
+    selectedLeads,
+    updateLead
+  } = useLeadsStore();
+
+  // View mode state with localStorage persistence
+  const [viewMode, setViewMode] = useState<'grid' | 'table'>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('signed-view-mode') as 'grid' | 'table') || 'table';
+    }
+    return 'table';
+  });
+
+  // Persist view mode changes
+  useEffect(() => {
+    localStorage.setItem('signed-view-mode', viewMode);
+  }, [viewMode]);
+  
+  // Search state
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  // Filter state
+  const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'week' | 'month' | 'year'>('all');
+  
+  // Sort state
+  const [sortOptions, setSortOptions] = useState<LeadSortOptions>({
+    field: 'updated_at',
+    direction: 'desc'
+  });
+
+  // Load leads on mount
+  useEffect(() => {
+    fetchLeadsByStatus('signed');
+  }, [fetchLeadsByStatus]);
+
+  // Filter and sort leads
+  const filteredLeads = useMemo(() => {
+    let result = leads.filter(lead => lead.status === 'signed');
+
+    // Apply search term
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      result = result.filter(lead =>
+        lead.name?.toLowerCase().includes(term) ||
+        lead.phone?.toLowerCase().includes(term) ||
+        lead.provider?.toLowerCase().includes(term) ||
+        lead.address?.toLowerCase().includes(term) ||
+        lead.type_of_business?.toLowerCase().includes(term) ||
+        lead.notes?.toLowerCase().includes(term)
+      );
+    }
+
+    // Apply date filter
+    if (dateFilter !== 'all') {
+      const now = new Date();
+      const filterDate = new Date();
+      
+      switch (dateFilter) {
+        case 'today':
+          filterDate.setHours(0, 0, 0, 0);
+          break;
+        case 'week':
+          filterDate.setDate(now.getDate() - 7);
+          break;
+        case 'month':
+          filterDate.setMonth(now.getMonth() - 1);
+          break;
+        case 'year':
+          filterDate.setFullYear(now.getFullYear() - 1);
+          break;
+      }
+      
+      result = result.filter(lead => 
+        new Date(lead.updated_at) >= filterDate
+      );
+    }
+
+    // Apply sorting
+    result.sort((a, b) => {
+      const { field, direction } = sortOptions;
+      let valueA = a[field];
+      let valueB = b[field];
+
+      if (valueA === null || valueA === undefined) return direction === 'asc' ? 1 : -1;
+      if (valueB === null || valueB === undefined) return direction === 'asc' ? -1 : 1;
+
+      if (typeof valueA === 'string' && typeof valueB === 'string') {
+        const comparison = valueA.localeCompare(valueB);
+        return direction === 'asc' ? comparison : -comparison;
+      }
+
+      if (typeof valueA === 'number' && typeof valueB === 'number') {
+        return direction === 'asc' ? valueA - valueB : valueB - valueA;
+      }
+
+      return 0;
+    });
+
+    return result;
+  }, [leads, searchTerm, dateFilter, sortOptions]);
+
+  // Calculate success metrics
+  const metrics = useMemo(() => {
+    const total = filteredLeads.length;
+    const allSigned = leads.filter(l => l.status === 'signed').length;
+    
+    // Group by provider
+    const byProvider: Record<string, number> = {};
+    filteredLeads.forEach(lead => {
+      const provider = lead.provider || 'Unknown';
+      byProvider[provider] = (byProvider[provider] || 0) + 1;
+    });
+
+    // Group by business type
+    const byBusinessType: Record<string, number> = {};
+    filteredLeads.forEach(lead => {
+      const type = lead.type_of_business || 'Unknown';
+      byBusinessType[type] = (byBusinessType[type] || 0) + 1;
+    });
+
+    // Calculate conversion rate (assuming total leads ever created)
+    const totalLeads = leads.length;
+    const conversionRate = totalLeads > 0 ? ((allSigned / totalLeads) * 100).toFixed(1) : '0';
+
+    // Recent signings (last 7 days)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const recentSignings = filteredLeads.filter(lead => 
+      new Date(lead.updated_at) >= sevenDaysAgo
+    ).length;
+
+    return {
+      total,
+      allSigned,
+      byProvider,
+      byBusinessType,
+      conversionRate,
+      recentSignings
+    };
+  }, [filteredLeads, leads]);
+
+  // Handle export
+  const handleExport = () => {
+    const headers = [
+      'Number', 
+      'Name', 
+      'Provider', 
+      'Phone', 
+      'Address', 
+      'Business Type', 
+      'Signed Date', 
+      'Notes'
+    ];
+    const rows = filteredLeads.map(lead => [
+      lead.number,
+      lead.name,
+      lead.provider || '',
+      lead.phone || '',
+      lead.address || '',
+      lead.type_of_business || '',
+      new Date(lead.updated_at).toLocaleDateString(),
+      lead.notes || ''
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `signed-leads-${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  // Get days since signed
+  const getDaysSinceSigned = (updatedAt: string) => {
+    return Math.floor((Date.now() - new Date(updatedAt).getTime()) / (1000 * 60 * 60 * 24));
+  };
+
+  // Handle status change
+  const handleStatusChange = async (leadId: string, newStatus: string, additionalData?: any) => {
+    try {
+      await updateLead(leadId, {
+        status: newStatus as any,
+        ...additionalData,
+        updated_at: new Date().toISOString()
+      });
+      // Refresh the leads list
+      fetchLeadsByStatus('signed');
+    } catch (error) {
+      console.error('Failed to update lead status:', error);
+      throw error;
+    }
+  };
+
+  return (
+    <div className="container mx-auto px-4 py-8 max-w-7xl">
+      {/* Header */}
+      <div className="mb-8">
+        <h1 className="text-4xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent mb-2">
+          Signed Leads
+        </h1>
+        <p className="text-gray-600">
+          Track successful conversions and celebrate wins
+        </p>
+      </div>
+
+      {/* Success Banner */}
+      <Card variant="glass" padding="md" className="mb-6 bg-green-50 border-green-200">
+        <div className="flex items-start gap-3">
+          <Award className="w-6 h-6 text-green-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <h3 className="font-semibold text-green-900 mb-1">Success Tracker</h3>
+            <p className="text-sm text-green-700">
+              These leads have been successfully converted. Keep up the great work!
+            </p>
+          </div>
+        </div>
+      </Card>
+
+      {/* Success Metrics */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <Card variant="glass" padding="md" className="bg-green-50">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm text-green-600 mb-1">Total Signed</div>
+              <div className="text-3xl font-bold text-green-600">{metrics.allSigned}</div>
+            </div>
+            <CheckCircle className="w-8 h-8 text-green-600 opacity-50" />
+          </div>
+        </Card>
+        <Card variant="glass" padding="md" className="bg-blue-50">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm text-blue-600 mb-1">This Period</div>
+              <div className="text-3xl font-bold text-blue-600">{metrics.total}</div>
+            </div>
+            <TrendingUp className="w-8 h-8 text-blue-600 opacity-50" />
+          </div>
+        </Card>
+        <Card variant="glass" padding="md" className="bg-purple-50">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm text-purple-600 mb-1">Conversion Rate</div>
+              <div className="text-3xl font-bold text-purple-600">{metrics.conversionRate}%</div>
+            </div>
+            <DollarSign className="w-8 h-8 text-purple-600 opacity-50" />
+          </div>
+        </Card>
+        <Card variant="glass" padding="md" className="bg-yellow-50">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm text-yellow-600 mb-1">Last 7 Days</div>
+              <div className="text-3xl font-bold text-yellow-600">{metrics.recentSignings}</div>
+            </div>
+            <Calendar className="w-8 h-8 text-yellow-600 opacity-50" />
+          </div>
+        </Card>
+      </div>
+
+      {/* Provider Breakdown */}
+      {Object.keys(metrics.byProvider).length > 0 && (
+        <Card variant="glass" padding="md" className="mb-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-3">Signed by Provider</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {Object.entries(metrics.byProvider)
+              .sort((a, b) => b[1] - a[1])
+              .map(([provider, count]) => (
+                <div key={provider} className="bg-gray-50 p-3 rounded-lg">
+                  <div className="text-sm text-gray-600">{provider}</div>
+                  <div className="text-2xl font-bold text-gray-900">{count}</div>
+                </div>
+              ))}
+          </div>
+        </Card>
+      )}
+
+      {/* Search and Filter Bar */}
+      <Card variant="glass" padding="md" className="mb-6">
+        <div className="flex flex-col md:flex-row gap-4">
+          {/* Search */}
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <input
+              type="text"
+              placeholder="Search signed leads..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="input pl-10 w-full"
+              aria-label="Search leads"
+            />
+          </div>
+
+          {/* Date Filter */}
+          <select
+            value={dateFilter}
+            onChange={(e) => setDateFilter(e.target.value as any)}
+            className="input"
+          >
+            <option value="all">All Time</option>
+            <option value="today">Today</option>
+            <option value="week">Last 7 Days</option>
+            <option value="month">Last Month</option>
+            <option value="year">Last Year</option>
+          </select>
+
+          {/* View Mode Toggle */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => setViewMode('table')}
+              className={cn(
+                'btn',
+                viewMode === 'table' ? 'btn-primary' : 'btn-secondary'
+              )}
+              aria-label="Table view"
+            >
+              <ListIcon className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setViewMode('grid')}
+              className={cn(
+                'btn',
+                viewMode === 'grid' ? 'btn-primary' : 'btn-secondary'
+              )}
+              aria-label="Grid view"
+            >
+              <Grid className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Add Lead Button */}
+          <AddLeadButton defaultStatus="signed" onSuccess={() => fetchLeadsByStatus('signed')} />
+          
+          {/* Export Button */}
+          <button
+            onClick={handleExport}
+            className="btn btn-success flex items-center gap-2"
+            aria-label="Export leads"
+          >
+            <Download className="w-4 h-4" />
+            Export
+          </button>
+        </div>
+      </Card>
+
+      {/* Loading State */}
+      {isLoading && (
+        <div className="text-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
+          <p className="text-gray-600 mt-4">Loading leads...</p>
+        </div>
+      )}
+
+      {/* Error State */}
+      {error && (
+        <Card variant="glass" padding="md" className="bg-red-50 border-red-200 mb-6">
+          <p className="text-red-600">{error}</p>
+        </Card>
+      )}
+
+      {/* Leads Display */}
+      {!isLoading && !error && (
+        <>
+          {viewMode === 'table' ? (
+            <div className="space-y-3">
+              {filteredLeads.map(lead => (
+                <Card
+                  key={lead.id}
+                  variant="glass"
+                  padding="md"
+                  className="bg-green-50 border-green-200 hover:shadow-lg transition-shadow"
+                >
+                  <div className="flex flex-col md:flex-row gap-4">
+                    {/* Success Icon */}
+                    <div className="flex items-center justify-center md:justify-start">
+                      <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center">
+                        <CheckCircle className="w-7 h-7 text-white" />
+                      </div>
+                    </div>
+
+                    {/* Lead Info */}
+                    <div className="flex-1">
+                      <div className="flex items-start justify-between mb-2">
+                        <div>
+                          <h3 className="text-lg font-bold text-gray-900">{lead.name}</h3>
+                          <p className="text-sm text-gray-600">
+                            {lead.provider && (
+                              <span className={cn(
+                                'font-medium',
+                                lead.provider.toLowerCase().includes('telkom') && 'text-blue-600'
+                              )}>
+                                {lead.provider}
+                              </span>
+                            )}
+                            {lead.type_of_business && ` • ${lead.type_of_business}`}
+                          </p>
+                        </div>
+                        <span className="text-xs font-semibold text-gray-500">
+                          #{lead.number}
+                        </span>
+                      </div>
+
+                      <div className="space-y-1 mb-2">
+                        {lead.phone && (
+                          <div className="flex items-center gap-2 text-sm text-gray-700">
+                            <Phone className="w-4 h-4" />
+                            <a href={`tel:${lead.phone}`} className="hover:text-blue-600">
+                              {lead.phone}
+                            </a>
+                          </div>
+                        )}
+                        {lead.address && (
+                          <div className="flex items-center gap-2 text-sm text-gray-700">
+                            <MapPin className="w-4 h-4" />
+                            <span className="line-clamp-1">{lead.address}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {lead.notes && (
+                        <p className="text-sm text-gray-600 italic mb-2">💬 {lead.notes}</p>
+                      )}
+
+                      <div className="flex items-center gap-4 text-xs text-gray-500">
+                        <span className="flex items-center gap-1">
+                          <CheckCircle className="w-3 h-3" />
+                          Signed {getDaysSinceSigned(lead.updated_at)} days ago
+                        </span>
+                        <span>
+                          {new Date(lead.updated_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Success Badge and Actions */}
+                    <div className="flex flex-col items-center justify-center gap-3 min-w-[120px]">
+                      <div className="bg-green-100 text-green-700 px-4 py-2 rounded-full font-semibold text-sm whitespace-nowrap">
+                        ✓ Signed
+                      </div>
+                      <LeadFilesButton lead={lead} />
+                    </div>
+                  </div>
+
+                  {/* Status Manager - Compact Dropdown */}
+                  <div className="mt-3 pt-3 border-t border-green-200">
+                    <label className="text-xs font-medium text-gray-600 mb-1 block">
+                      Change Status:
+                    </label>
+                    <StatusManager
+                      lead={lead}
+                      onStatusChange={handleStatusChange}
+                      compact={true}
+                    />
+                  </div>
+
+                  {/* Notes & Reminders Dropdown */}
+                  <LeadNotesRemindersDropdown lead={lead} />
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredLeads.map(lead => (
+                <div key={lead.id} className="relative space-y-2">
+                  <LeadCard
+                    lead={lead}
+                    onStatusChange={() => {}}
+                    onEdit={() => {}}
+                    onDelete={() => {}}
+                    isSelected={selectedLeads.includes(lead.id)}
+                    onSelect={(id) => {
+                      if (selectedLeads.includes(id)) {
+                        deselectLead(id);
+                      } else {
+                        selectLead(id);
+                      }
+                    }}
+                    showActions={false}
+                  />
+                  <div className="absolute top-2 right-2">
+                    <div className="bg-green-500 text-white p-2 rounded-full">
+                      <CheckCircle className="w-5 h-5" />
+                    </div>
+                  </div>
+                  <LeadNotesRemindersDropdown lead={lead} />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Empty State */}
+          {filteredLeads.length === 0 && (
+            <Card variant="glass" padding="lg" className="text-center">
+              <Award className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-500 text-lg mb-2">
+                {dateFilter !== 'all' ? 'No signed leads in this period' : 'No signed leads yet'}
+              </p>
+              <p className="text-gray-400 text-sm">
+                {dateFilter !== 'all' 
+                  ? 'Try selecting a different time period'
+                  : 'Successfully converted leads will appear here'
+                }
+              </p>
+            </Card>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
