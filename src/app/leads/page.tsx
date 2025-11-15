@@ -34,7 +34,7 @@ const RoutesPageContent = lazy(() => import('@/app/leads/routes-pages/page'));
 export default function LeadsManagerPage() {
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
-  const { leads, fetchLeads, isLoading: leadsLoading } = useLeadsStore();
+  const { leads, allLeads, fetchLeads, fetchAllLeadsForStats, isLoading: leadsLoading } = useLeadsStore();
   const { routes, fetchRoutes, getRouteStats } = useRoutesStore();
   const { sessions, fetchImportSessions } = useImportStore();
   const { fetchAllReminders } = useRemindersStore();
@@ -67,23 +67,26 @@ export default function LeadsManagerPage() {
     recentImports: 0
   });
 
+  // Fetch ALL leads for dashboard stats (separate from filtered leads)
   useEffect(() => {
     if (user) {
-      fetchLeads();
+      // Fetch all leads for accurate dashboard stats
+      fetchAllLeadsForStats();
       fetchRoutes();
       fetchImportSessions();
       fetchAllReminders(user.id); // Initialize reminders store
     }
-  }, [user, fetchLeads, fetchRoutes, fetchImportSessions, fetchAllReminders]);
+  }, [user, fetchAllLeadsForStats, fetchRoutes, fetchImportSessions, fetchAllReminders]);
 
   useEffect(() => {
-    // Calculate statistics
-    const totalLeads = leads.length;
-    const activeLeads = leads.filter(l => l.status === 'leads').length;
-    const workingLeads = leads.filter(l => l.status === 'working').length;
-    const laterStageLeads = leads.filter(l => l.status === 'later').length;
-    const signedLeads = leads.filter(l => l.status === 'signed').length;
-    const badLeads = leads.filter(l => l.status === 'bad').length;
+    // Calculate statistics from ALL leads (not filtered by current tab)
+    // Use allLeads array which is never filtered, ensuring stats are always accurate
+    const totalLeads = allLeads.length;
+    const activeLeads = allLeads.filter(l => l.status === 'leads').length;
+    const workingLeads = allLeads.filter(l => l.status === 'working').length;
+    const laterStageLeads = allLeads.filter(l => l.status === 'later').length;
+    const signedLeads = allLeads.filter(l => l.status === 'signed').length;
+    const badLeads = allLeads.filter(l => l.status === 'bad').length;
     const routeStats = getRouteStats();
     const recentImports = sessions.filter(s => {
       const sessionDate = new Date(s.created_at);
@@ -91,6 +94,17 @@ export default function LeadsManagerPage() {
       weekAgo.setDate(weekAgo.getDate() - 7);
       return sessionDate >= weekAgo;
     }).length;
+
+    // Debug logging to verify stats are calculated from all leads
+    console.log('[Dashboard Stats] Calculating from allLeads:', {
+      totalLeads,
+      activeLeads,
+      workingLeads,
+      laterStageLeads,
+      signedLeads,
+      badLeads,
+      allLeadsCount: allLeads.length
+    });
 
     setStats({
       totalLeads,
@@ -102,7 +116,7 @@ export default function LeadsManagerPage() {
       totalRoutes: routeStats.total,
       recentImports
     });
-  }, [leads, routes, sessions, getRouteStats]);
+  }, [allLeads, routes, sessions, getRouteStats]);
 
   // Get recent activity (last 5 imports or routes)
   const recentActivity = [
@@ -262,100 +276,100 @@ export default function LeadsManagerPage() {
               <div className="animate-fade-in-up">
                 {tabIndex === 0 && (
                   <div>
-                    {/* Dashboard Content */}
-                    <div className="mb-8">
-                      <h1 className="text-4xl font-bold text-gray-900 mb-2">
+                    {/* Dashboard Content - Mobile Optimized */}
+                    <div className="mb-6 sm:mb-8">
+                      <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-2">
                         Leads Manager Dashboard
                       </h1>
-                      <p className="text-lg text-gray-600">
+                      <p className="text-sm sm:text-base lg:text-lg text-gray-600">
                         Welcome back! Here's your lead management overview.
                       </p>
                     </div>
 
-                    {/* Statistics Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    {/* Statistics Grid - Mobile Optimized */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
                       {/* Total Leads */}
-                      <div className="glass-card p-6 hover:scale-105 transition-transform duration-200">
-                        <div className="flex items-center justify-between mb-4">
-                          <div className="p-3 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg">
-                            <Users className="w-6 h-6 text-white" />
+                      <div className="glass-card p-4 sm:p-6 hover:scale-105 transition-transform duration-200 touch-manipulation">
+                        <div className="flex items-center justify-between mb-3 sm:mb-4">
+                          <div className="p-2 sm:p-3 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg">
+                            <Users className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                           </div>
-                          <TrendingUp className="w-5 h-5 text-green-500" />
+                          <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-green-500" />
                         </div>
-                        <h3 className="text-3xl font-bold text-gray-900 mb-1">{stats.totalLeads}</h3>
-                        <p className="text-sm text-gray-600">Total Leads</p>
-                        <div className="mt-3 text-xs text-gray-500">
+                        <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">{stats.totalLeads}</h3>
+                        <p className="text-xs sm:text-sm text-gray-600">Total Leads</p>
+                        <div className="mt-2 sm:mt-3 text-xs text-gray-500">
                           {stats.activeLeads} active
                         </div>
                       </div>
 
                       {/* Working Leads */}
-                      <div className="glass-card p-6 hover:scale-105 transition-transform duration-200">
-                        <div className="flex items-center justify-between mb-4">
-                          <div className="p-3 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg">
-                            <Clock className="w-6 h-6 text-white" />
+                      <div className="glass-card p-4 sm:p-6 hover:scale-105 transition-transform duration-200 touch-manipulation">
+                        <div className="flex items-center justify-between mb-3 sm:mb-4">
+                          <div className="p-2 sm:p-3 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg">
+                            <Clock className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                           </div>
                         </div>
-                        <h3 className="text-3xl font-bold text-gray-900 mb-1">{stats.workingLeads}</h3>
-                        <p className="text-sm text-gray-600">Working On</p>
-                        <div className="mt-3 text-xs text-gray-500">
+                        <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">{stats.workingLeads}</h3>
+                        <p className="text-xs sm:text-sm text-gray-600">Working On</p>
+                        <div className="mt-2 sm:mt-3 text-xs text-gray-500">
                           {stats.laterStageLeads} in later stage
                         </div>
                       </div>
 
                       {/* Signed Leads */}
-                      <div className="glass-card p-6 hover:scale-105 transition-transform duration-200">
-                        <div className="flex items-center justify-between mb-4">
-                          <div className="p-3 bg-gradient-to-br from-green-500 to-emerald-500 rounded-lg">
-                            <CheckCircle className="w-6 h-6 text-white" />
+                      <div className="glass-card p-4 sm:p-6 hover:scale-105 transition-transform duration-200 touch-manipulation">
+                        <div className="flex items-center justify-between mb-3 sm:mb-4">
+                          <div className="p-2 sm:p-3 bg-gradient-to-br from-green-500 to-emerald-500 rounded-lg">
+                            <CheckCircle className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                           </div>
                         </div>
-                        <h3 className="text-3xl font-bold text-gray-900 mb-1">{stats.signedLeads}</h3>
-                        <p className="text-sm text-gray-600">Signed</p>
-                        <div className="mt-3 text-xs text-gray-500">
+                        <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">{stats.signedLeads}</h3>
+                        <p className="text-xs sm:text-sm text-gray-600">Signed</p>
+                        <div className="mt-2 sm:mt-3 text-xs text-gray-500">
                           {stats.badLeads} bad leads
                         </div>
                       </div>
 
                       {/* Routes Generated */}
-                      <div className="glass-card p-6 hover:scale-105 transition-transform duration-200">
-                        <div className="flex items-center justify-between mb-4">
-                          <div className="p-3 bg-gradient-to-br from-orange-500 to-red-500 rounded-lg">
-                            <MapPin className="w-6 h-6 text-white" />
+                      <div className="glass-card p-4 sm:p-6 hover:scale-105 transition-transform duration-200 touch-manipulation">
+                        <div className="flex items-center justify-between mb-3 sm:mb-4">
+                          <div className="p-2 sm:p-3 bg-gradient-to-br from-orange-500 to-red-500 rounded-lg">
+                            <MapPin className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                           </div>
                         </div>
-                        <h3 className="text-3xl font-bold text-gray-900 mb-1">{stats.totalRoutes}</h3>
-                        <p className="text-sm text-gray-600">Routes Generated</p>
-                        <div className="mt-3 text-xs text-gray-500">
+                        <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">{stats.totalRoutes}</h3>
+                        <p className="text-xs sm:text-sm text-gray-600">Routes Generated</p>
+                        <div className="mt-2 sm:mt-3 text-xs text-gray-500">
                           {stats.recentImports} recent imports
                         </div>
                       </div>
                     </div>
 
-                    {/* Quick Actions */}
-                    <div className="glass-card p-6 mb-8">
-                      <h2 className="text-2xl font-semibold text-gray-900 mb-6">Quick Actions</h2>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {/* Quick Actions - Mobile Optimized */}
+                    <div className="glass-card p-4 sm:p-6 mb-6 sm:mb-8">
+                      <h2 className="text-xl sm:text-2xl font-semibold text-gray-900 mb-4 sm:mb-6">Quick Actions</h2>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                         {quickActions.map((action) => (
                           <button
                             key={action.title}
                             onClick={action.onClick}
-                            className="group relative overflow-hidden rounded-xl p-6 bg-white border border-gray-200 hover:border-transparent hover:shadow-xl transition-all duration-300 text-left"
+                            className="group relative overflow-hidden rounded-xl p-4 sm:p-6 bg-white border border-gray-200 hover:border-transparent hover:shadow-xl transition-all duration-300 text-left touch-manipulation active:scale-95"
                           >
                             <div className={`absolute inset-0 bg-gradient-to-br ${action.color} opacity-0 group-hover:opacity-10 transition-opacity duration-300`} />
                             <div className="relative">
-                              <div className={`inline-flex p-3 rounded-lg bg-gradient-to-br ${action.color} mb-4`}>
-                                <action.icon className="w-6 h-6 text-white" />
+                              <div className={`inline-flex p-2 sm:p-3 rounded-lg bg-gradient-to-br ${action.color} mb-3 sm:mb-4`}>
+                                <action.icon className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                               </div>
-                              <h3 className="text-lg font-semibold text-gray-900 mb-2 group-hover:text-gray-700">
+                              <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-1 sm:mb-2 group-hover:text-gray-700">
                                 {action.title}
                               </h3>
-                              <p className="text-sm text-gray-600 mb-3">
+                              <p className="text-xs sm:text-sm text-gray-600 mb-2 sm:mb-3">
                                 {action.description}
                               </p>
-                              <div className="flex items-center text-sm font-medium text-gray-900 group-hover:text-blue-600">
+                              <div className="flex items-center text-xs sm:text-sm font-medium text-gray-900 group-hover:text-blue-600">
                                 Get started
-                                <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
+                                <ArrowRight className="w-3 h-3 sm:w-4 sm:h-4 ml-2 group-hover:translate-x-1 transition-transform" />
                               </div>
                             </div>
                           </button>
@@ -363,11 +377,11 @@ export default function LeadsManagerPage() {
                       </div>
                     </div>
 
-                    {/* Calendar and Upcoming Events */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                    {/* Calendar and Upcoming Events - Mobile Optimized */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
                       {/* Calendar */}
                       <CallbackCalendar 
-                        leads={leads.filter(l => l.date_to_call_back)} 
+                        leads={allLeads.filter(l => l.date_to_call_back)} 
                         onLeadClick={(lead) => {
                           // Navigate to the appropriate tab based on lead status
                           const tabMap: Record<string, number> = {
@@ -384,7 +398,7 @@ export default function LeadsManagerPage() {
 
                       {/* Upcoming Reminders */}
                       <UpcomingReminders 
-                        leads={leads}
+                        leads={allLeads}
                         onLeadClick={(lead) => {
                           // Navigate to the appropriate tab based on lead status
                           const tabMap: Record<string, number> = {
@@ -401,9 +415,9 @@ export default function LeadsManagerPage() {
                       />
                     </div>
 
-                    {/* Recent Activity */}
-                    <div className="glass-card p-6">
-                      <h2 className="text-2xl font-semibold text-gray-900 mb-6">Recent Activity</h2>
+                    {/* Recent Activity - Mobile Optimized */}
+                    <div className="glass-card p-4 sm:p-6">
+                      <h2 className="text-xl sm:text-2xl font-semibold text-gray-900 mb-4 sm:mb-6">Recent Activity</h2>
                       
                       {recentActivity.length === 0 ? (
                         <div className="text-center py-12">
@@ -418,36 +432,36 @@ export default function LeadsManagerPage() {
                           </button>
                         </div>
                       ) : (
-                        <div className="space-y-4">
+                        <div className="space-y-3 sm:space-y-4">
                           {recentActivity.map((activity, index) => (
                             <div
                               key={index}
-                              className="flex items-center justify-between p-4 bg-white border border-gray-200 rounded-lg hover:border-gray-300 transition-colors"
+                              className="flex items-center justify-between p-3 sm:p-4 bg-white border border-gray-200 rounded-lg hover:border-gray-300 transition-colors"
                             >
-                              <div className="flex items-center space-x-4">
-                                <div className={`p-2 rounded-lg ${
+                              <div className="flex items-center space-x-3 sm:space-x-4 flex-1 min-w-0">
+                                <div className={`p-2 rounded-lg flex-shrink-0 ${
                                   activity.type === 'import' 
                                     ? 'bg-blue-100' 
                                     : 'bg-green-100'
                                 }`}>
                                   {activity.type === 'import' ? (
-                                    <FileUp className={`w-5 h-5 ${
+                                    <FileUp className={`w-4 h-4 sm:w-5 sm:h-5 ${
                                       activity.status === 'completed' ? 'text-blue-600' : 'text-gray-400'
                                     }`} />
                                   ) : (
-                                    <MapPin className="w-5 h-5 text-green-600" />
+                                    <MapPin className="w-4 h-4 sm:w-5 sm:h-5 text-green-600" />
                                   )}
                                 </div>
-                                <div>
-                                  <h4 className="font-semibold text-gray-900">{activity.title}</h4>
-                                  <p className="text-sm text-gray-600">{activity.subtitle}</p>
+                                <div className="flex-1 min-w-0">
+                                  <h4 className="font-semibold text-sm sm:text-base text-gray-900 truncate">{activity.title}</h4>
+                                  <p className="text-xs sm:text-sm text-gray-600 truncate">{activity.subtitle}</p>
                                 </div>
                               </div>
-                              <div className="text-right">
-                                <p className="text-sm text-gray-500">
+                              <div className="text-right flex-shrink-0 ml-2">
+                                <p className="text-xs sm:text-sm text-gray-500 whitespace-nowrap">
                                   {activity.timestamp.toLocaleDateString()}
                                 </p>
-                                <p className="text-xs text-gray-400">
+                                <p className="text-xs text-gray-400 whitespace-nowrap">
                                   {activity.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                 </p>
                               </div>

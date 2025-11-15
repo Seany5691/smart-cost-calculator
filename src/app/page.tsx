@@ -10,6 +10,8 @@ import ActivityTimeline from '@/components/dashboard/ActivityTimeline';
 import { getDashboardStatsOptimized } from '@/lib/dashboardStats';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { StatCardSkeleton } from '@/components/ui/skeletons';
+import NumberLookup from '@/components/scraper/NumberLookup';
+import BusinessLookup from '@/components/scraper/BusinessLookup';
 
 export default function DashboardPage() {
   const { user, checkAuth } = useAuthStore();
@@ -138,6 +140,23 @@ export default function DashboardPage() {
         </p>
       </div>
 
+      {/* Lookup Tools - Side by Side */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8 relative z-10">
+        {/* Number Lookup */}
+        <div className="animate-fade-in-up" style={!isMobile ? { animationDelay: '0.1s' } : undefined}>
+          <GlassCard className="p-6">
+            <NumberLookup />
+          </GlassCard>
+        </div>
+
+        {/* Business Lookup */}
+        <div className="animate-fade-in-up" style={!isMobile ? { animationDelay: '0.2s' } : undefined}>
+          <GlassCard className="p-6">
+            <BusinessLookup />
+          </GlassCard>
+        </div>
+      </div>
+
       {/* Quick Actions Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8 relative z-10">
         {quickActions.map((action, index) => {
@@ -147,7 +166,7 @@ export default function DashboardPage() {
               key={index}
               href={action.href}
               className="block animate-fade-in-up"
-              style={!isMobile ? { animationDelay: `${0.1 + index * 0.1}s` } : undefined}
+              style={!isMobile ? { animationDelay: `${0.3 + index * 0.1}s` } : undefined}
             >
               <GlassCard className="h-full p-6">
                 <div className="flex items-start space-x-4">
@@ -171,7 +190,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Recent Activity Section */}
-      <div className="mt-8 relative z-10 animate-fade-in-up" style={!isMobile ? { animationDelay: '0.7s' } : undefined}>
+      <div className="mt-8 relative z-10 animate-fade-in-up" style={!isMobile ? { animationDelay: '0.9s' } : undefined}>
         <ActivityTimeline 
           userRole={user.role as 'admin' | 'manager' | 'user'} 
           currentUserId={user.id}
@@ -196,7 +215,7 @@ export default function DashboardPage() {
               trend={0}
               animated
               className="animate-fade-in-up"
-              style={!isMobile ? ({ animationDelay: '0.8s' } as React.CSSProperties) : undefined}
+              style={!isMobile ? ({ animationDelay: '1.0s' } as React.CSSProperties) : undefined}
             />
             <StatCard
               label="Active Projects"
@@ -205,7 +224,7 @@ export default function DashboardPage() {
               trend={0}
               animated
               className="animate-fade-in-up"
-              style={!isMobile ? ({ animationDelay: '0.9s' } as React.CSSProperties) : undefined}
+              style={!isMobile ? ({ animationDelay: '1.1s' } as React.CSSProperties) : undefined}
             />
             <StatCard
               label="Calculations"
@@ -214,7 +233,7 @@ export default function DashboardPage() {
               trend={0}
               animated
               className="animate-fade-in-up"
-              style={!isMobile ? ({ animationDelay: '1.0s' } as React.CSSProperties) : undefined}
+              style={!isMobile ? ({ animationDelay: '1.2s' } as React.CSSProperties) : undefined}
             />
           </>
         )}

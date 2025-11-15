@@ -424,60 +424,60 @@ export default function WorkingOnStatusPage() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-7xl">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold bg-gradient-to-r from-yellow-600 to-orange-600 bg-clip-text text-transparent mb-2">
+    <div className="container mx-auto px-3 sm:px-4 py-6 sm:py-8 max-w-7xl">
+      {/* Header - Mobile Optimized */}
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-yellow-600 to-orange-600 bg-clip-text text-transparent mb-1 sm:mb-2">
           Working On
         </h1>
-        <p className="text-gray-600">
+        <p className="text-sm sm:text-base text-gray-600">
           Track progress and manage active leads
         </p>
       </div>
 
-      {/* Progress Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <Card variant="glass" padding="md">
+      {/* Progress Metrics - Mobile Optimized */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
+        <Card variant="glass" padding="sm" className="sm:p-4">
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-sm text-gray-600 mb-1">Active Leads</div>
-              <div className="text-3xl font-bold text-yellow-600">{progressMetrics.total}</div>
+              <div className="text-xs sm:text-sm text-gray-600 mb-0.5 sm:mb-1">Active Leads</div>
+              <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-yellow-600">{progressMetrics.total}</div>
             </div>
-            <Clock className="w-8 h-8 text-yellow-600 opacity-50" />
+            <Clock className="w-6 h-6 sm:w-8 sm:h-8 text-yellow-600 opacity-50" />
           </div>
         </Card>
-        <Card variant="glass" padding="md">
+        <Card variant="glass" padding="sm" className="sm:p-4">
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-sm text-gray-600 mb-1">With Notes</div>
-              <div className="text-3xl font-bold text-blue-600">{progressMetrics.withNotes}</div>
+              <div className="text-xs sm:text-sm text-gray-600 mb-0.5 sm:mb-1">With Notes</div>
+              <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-blue-600">{progressMetrics.withNotes}</div>
             </div>
-            <MessageSquare className="w-8 h-8 text-blue-600 opacity-50" />
+            <MessageSquare className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600 opacity-50" />
           </div>
         </Card>
-        <Card variant="glass" padding="md">
+        <Card variant="glass" padding="sm" className="sm:p-4">
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-sm text-gray-600 mb-1">With Reminders</div>
-              <div className="text-3xl font-bold text-purple-600">{progressMetrics.withReminders}</div>
+              <div className="text-xs sm:text-sm text-gray-600 mb-0.5 sm:mb-1">With Reminders</div>
+              <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-purple-600">{progressMetrics.withReminders}</div>
             </div>
-            <Bell className="w-8 h-8 text-purple-600 opacity-50" />
+            <Bell className="w-6 h-6 sm:w-8 sm:h-8 text-purple-600 opacity-50" />
           </div>
         </Card>
-        <Card variant="glass" padding="md">
+        <Card variant="glass" padding="sm" className="sm:p-4">
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-sm text-gray-600 mb-1">Recently Updated</div>
-              <div className="text-3xl font-bold text-green-600">{progressMetrics.recentlyUpdated}</div>
+              <div className="text-xs sm:text-sm text-gray-600 mb-0.5 sm:mb-1">Recently Updated</div>
+              <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-green-600">{progressMetrics.recentlyUpdated}</div>
             </div>
-            <CheckCircle className="w-8 h-8 text-green-600 opacity-50" />
+            <CheckCircle className="w-6 h-6 sm:w-8 sm:h-8 text-green-600 opacity-50" />
           </div>
         </Card>
       </div>
 
-      {/* Search and Action Bar */}
-      <Card variant="glass" padding="md" className="mb-6">
-        <div className="flex flex-col md:flex-row gap-4">
+      {/* Search and Action Bar - Mobile Optimized */}
+      <Card variant="glass" padding="sm" className="sm:p-4 mb-4 sm:mb-6">
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
           {/* Search */}
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -491,12 +491,12 @@ export default function WorkingOnStatusPage() {
             />
           </div>
 
-          {/* View Mode Toggle */}
+          {/* View Mode Toggle - Mobile Optimized */}
           <div className="flex gap-2">
             <button
               onClick={() => setViewMode('table')}
               className={cn(
-                'btn',
+                'btn touch-manipulation',
                 viewMode === 'table' ? 'btn-primary' : 'btn-secondary'
               )}
               aria-label="Table view"
@@ -506,7 +506,7 @@ export default function WorkingOnStatusPage() {
             <button
               onClick={() => setViewMode('grid')}
               className={cn(
-                'btn',
+                'btn touch-manipulation',
                 viewMode === 'grid' ? 'btn-primary' : 'btn-secondary'
               )}
               aria-label="Grid view"
@@ -518,14 +518,14 @@ export default function WorkingOnStatusPage() {
           {/* Add Lead Button */}
           <AddLeadButton defaultStatus="working" onSuccess={() => fetchLeadsByStatus('working')} />
           
-          {/* Export Button */}
+          {/* Export Button - Mobile Optimized */}
           <button
             onClick={() => handleExport()}
-            className="btn btn-success flex items-center gap-2"
+            className="btn btn-success flex items-center gap-2 touch-manipulation"
             aria-label="Export leads"
           >
             <Download className="w-4 h-4" />
-            Export
+            <span className="hidden sm:inline">Export</span>
           </button>
         </div>
       </Card>

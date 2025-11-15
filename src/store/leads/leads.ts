@@ -11,7 +11,8 @@ import { useAuthStore } from '@/store/auth';
 import { supabaseLeads } from '@/lib/leads/supabaseLeads';
 
 interface LeadsState {
-  leads: Lead[];
+  leads: Lead[]; // Filtered leads for current view
+  allLeads: Lead[]; // All leads for dashboard stats (unfiltered)
   workingLeads: Lead[];
   selectedLeads: string[];
   isLoading: boolean;
@@ -20,6 +21,7 @@ interface LeadsState {
   
   // Actions
   fetchLeads: (filters?: LeadSearchFilters) => Promise<void>;
+  fetchAllLeadsForStats: () => Promise<void>; // New method for dashboard
   fetchLeadsByStatus: (status: LeadStatus) => Promise<void>;
   createLead: (leadData: LeadFormData) => Promise<Lead>;
   updateLead: (leadId: string, updates: Partial<Lead>) => Promise<Lead>;
@@ -40,6 +42,7 @@ interface LeadsState {
 
 export const useLeadsStore = create<LeadsState>((set, get) => ({
   leads: [],
+  allLeads: [], // Initialize allLeads array
   workingLeads: [],
   selectedLeads: [],
   isLoading: false,
@@ -65,12 +68,37 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
         leads: sortedLeads, 
         isLoading: false 
       });
+
+      // Also refresh allLeads in the background for accurate dashboard stats
+      // This runs asynchronously without blocking the UI
+      get().fetchAllLeadsForStats();
     } catch (error: any) {
       set({ 
         error: error.message || 'Failed to fetch leads', 
         isLoading: false 
       });
       throw error;
+    }
+  },
+
+  // Fetch ALL leads without filters for dashboard stats
+  fetchAllLeadsForStats: async () => {
+    try {
+      const user = useAuthStore.getState().user;
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
+      // Get ALL leads without any filters
+      const allLeads = await supabaseLeads.getLeads(user.id, {});
+      const sortedAllLeads = get().sortLeads(allLeads);
+      
+      console.log('[Leads Store] fetchAllLeadsForStats: Updated allLeads with', sortedAllLeads.length, 'leads');
+      
+      set({ allLeads: sortedAllLeads });
+    } catch (error: any) {
+      console.error('Failed to fetch all leads for stats:', error);
+      // Don't throw - this is a background operation for stats
     }
   },
 
@@ -90,6 +118,12 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
         leads: sortedLeads, 
         isLoading: false 
       });
+
+      console.log('[Leads Store] fetchLeadsByStatus: Fetched', sortedLeads.length, 'leads with status:', status);
+
+      // Also refresh allLeads in the background for accurate dashboard stats
+      // This runs asynchronously without blocking the UI
+      get().fetchAllLeadsForStats();
     } catch (error: any) {
       set({ 
         error: error.message || 'Failed to fetch leads by status', 
@@ -130,8 +164,13 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
       const currentLeads = get().leads;
       const updatedLeads = get().sortLeads([...currentLeads, createdLead]);
       
+      // Also update allLeads for dashboard stats
+      const currentAllLeads = get().allLeads;
+      const updatedAllLeads = get().sortLeads([...currentAllLeads, createdLead]);
+      
       set({ 
-        leads: updatedLeads, 
+        leads: updatedLeads,
+        allLeads: updatedAllLeads,
         isLoading: false 
       });
 
@@ -164,8 +203,16 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
       );
       const sortedLeads = get().sortLeads(updatedLeads);
       
+      // Also update allLeads for dashboard stats
+      const currentAllLeads = get().allLeads;
+      const updatedAllLeads = currentAllLeads.map(lead => 
+        lead.id === leadId ? updatedLead : lead
+      );
+      const sortedAllLeads = get().sortLeads(updatedAllLeads);
+      
       set({ 
-        leads: sortedLeads, 
+        leads: sortedLeads,
+        allLeads: sortedAllLeads,
         isLoading: false 
       });
 
@@ -195,8 +242,13 @@ export const useLeadsStore = create<LeadsState>((set, get) => ({
       const currentLeads = get().leads;
       const updatedLeads = currentLeads.filter(lead => lead.id !== leadId);
       
+      // Also remove from allLeads for dashboard stats
+      const currentAllLeads = get().allLeads;
+      const updatedAllLeads = currentAllLeads.filter(lead => lead.id !== leadId);
+      
       set({ 
-        leads: updatedLeads, 
+        leads: updatedLeads,
+        allLeads: updatedAllLeads,
         selectedLeads: get().selectedLeads.filter(id => id !== leadId),
         isLoading: false 
       });

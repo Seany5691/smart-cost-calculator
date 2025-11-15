@@ -200,12 +200,12 @@ export default function LeadsStatusPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-4">
+      {/* Header - Mobile Optimized */}
+      <div className="mb-6 sm:mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-3">
           <div>
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">Leads</h1>
-            <p className="text-lg text-gray-600">
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-1 sm:mb-2">Leads</h1>
+            <p className="text-sm sm:text-base lg:text-lg text-gray-600">
               Leads that have been through route generation and are ready to be worked on.
             </p>
           </div>
@@ -213,80 +213,80 @@ export default function LeadsStatusPage() {
             <button
               onClick={() => setViewMode('grid')}
               className={cn(
-                'p-2 rounded-lg transition-colors',
+                'p-2 rounded-lg transition-colors touch-manipulation',
                 viewMode === 'grid'
                   ? 'bg-blue-100 text-blue-600'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               )}
               aria-label="Grid view"
             >
-              <Grid className="w-5 h-5" />
+              <Grid className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
             <button
               onClick={() => setViewMode('table')}
               className={cn(
-                'p-2 rounded-lg transition-colors',
+                'p-2 rounded-lg transition-colors touch-manipulation',
                 viewMode === 'table'
                   ? 'bg-blue-100 text-blue-600'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               )}
               aria-label="Table view"
             >
-              <ListIcon className="w-5 h-5" />
+              <ListIcon className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
           </div>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <Card className="p-4">
+        {/* Stats - Mobile Optimized */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-4 sm:mb-6">
+          <Card className="p-3 sm:p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Total Leads</p>
-                <p className="text-2xl font-bold text-gray-900">{filteredLeads.length}</p>
+                <p className="text-xs sm:text-sm text-gray-600">Total Leads</p>
+                <p className="text-xl sm:text-2xl font-bold text-gray-900">{filteredLeads.length}</p>
               </div>
-              <FileText className="w-8 h-8 text-blue-500" />
+              <FileText className="w-6 h-6 sm:w-8 sm:h-8 text-blue-500" />
             </div>
           </Card>
-          <Card className="p-4">
+          <Card className="p-3 sm:p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">With Notes</p>
-                <p className="text-2xl font-bold text-gray-900">
+                <p className="text-xs sm:text-sm text-gray-600">With Notes</p>
+                <p className="text-xl sm:text-2xl font-bold text-gray-900">
                   {filteredLeads.filter(l => l.notes).length}
                 </p>
               </div>
-              <CheckCircle className="w-8 h-8 text-green-500" />
+              <CheckCircle className="w-6 h-6 sm:w-8 sm:h-8 text-green-500" />
             </div>
           </Card>
-          <Card className="p-4">
+          <Card className="p-3 sm:p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Selected</p>
-                <p className="text-2xl font-bold text-gray-900">{selectedLeads.length}</p>
+                <p className="text-xs sm:text-sm text-gray-600">Selected</p>
+                <p className="text-xl sm:text-2xl font-bold text-gray-900">{selectedLeads.length}</p>
               </div>
-              <Plus className="w-8 h-8 text-purple-500" />
+              <Plus className="w-6 h-6 sm:w-8 sm:h-8 text-purple-500" />
             </div>
           </Card>
         </div>
 
-        {/* Search and Filters */}
-        <div className="flex flex-col sm:flex-row gap-4 mb-6">
+        {/* Search and Filters - Mobile Optimized */}
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-4 sm:mb-6">
           <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
             <input
               type="text"
-              placeholder="Search leads by name, phone, provider, address..."
+              placeholder="Search leads..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full pl-9 sm:pl-10 pr-10 py-2 text-sm sm:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
             {searchTerm && (
               <button
                 onClick={() => setSearchTerm('')}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 touch-manipulation"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4 sm:w-5 sm:h-5" />
               </button>
             )}
           </div>
@@ -295,21 +295,21 @@ export default function LeadsStatusPage() {
           <AddLeadButton defaultStatus="leads" onSuccess={() => fetchLeadsByStatus('leads')} />
         </div>
 
-        {/* Bulk Actions Toolbar */}
+        {/* Bulk Actions Toolbar - Mobile Optimized */}
         {selectedLeads.length > 0 && (
-          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <span className="font-semibold text-blue-900">
+          <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-blue-50 border border-blue-200 rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3 sm:gap-4 w-full sm:w-auto">
+              <span className="text-sm sm:text-base font-semibold text-blue-900">
                 {selectedLeads.length} lead{selectedLeads.length > 1 ? 's' : ''} selected
               </span>
               <button
                 onClick={clearSelection}
-                className="text-sm text-blue-600 hover:text-blue-700 underline"
+                className="text-xs sm:text-sm text-blue-600 hover:text-blue-700 underline touch-manipulation"
               >
-                Clear selection
+                Clear
               </button>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 w-full sm:w-auto">
               <select
                 onChange={async (e) => {
                   if (e.target.value && confirm(`Change status of ${selectedLeads.length} leads?`)) {
@@ -320,7 +320,7 @@ export default function LeadsStatusPage() {
                   }
                   e.target.value = '';
                 }}
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                className="flex-1 sm:flex-none px-2 sm:px-3 py-2 border border-gray-300 rounded-lg text-xs sm:text-sm touch-manipulation"
                 defaultValue=""
               >
                 <option value="" disabled>Change Status...</option>
@@ -343,9 +343,9 @@ export default function LeadsStatusPage() {
                     }
                   }
                 }}
-                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm font-medium"
+                className="flex-1 sm:flex-none px-3 sm:px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 text-xs sm:text-sm font-medium touch-manipulation active:scale-95 transition-transform"
               >
-                Delete Selected
+                Delete
               </button>
             </div>
           </div>

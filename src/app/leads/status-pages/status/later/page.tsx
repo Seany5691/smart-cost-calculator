@@ -393,44 +393,44 @@ export default function LaterStagePage() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-7xl">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mb-2">
+    <div className="container mx-auto px-3 sm:px-4 py-6 sm:py-8 max-w-7xl">
+      {/* Header - Mobile Optimized */}
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent mb-1 sm:mb-2">
           Later Stage
         </h1>
-        <p className="text-gray-600">
+        <p className="text-sm sm:text-base text-gray-600">
           Manage callback dates and follow-up reminders
         </p>
       </div>
 
-      {/* Metrics */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-        <Card variant="glass" padding="md">
-          <div className="text-sm text-gray-600 mb-1">Total</div>
-          <div className="text-3xl font-bold text-purple-600">{metrics.total}</div>
+      {/* Metrics - Mobile Optimized */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3 lg:gap-4 mb-4 sm:mb-6">
+        <Card variant="glass" padding="sm" className="sm:p-3 lg:p-4">
+          <div className="text-xs sm:text-sm text-gray-600 mb-0.5 sm:mb-1">Total</div>
+          <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-purple-600">{metrics.total}</div>
         </Card>
-        <Card variant="glass" padding="md" className="bg-red-50">
-          <div className="text-sm text-red-600 mb-1">Overdue</div>
-          <div className="text-3xl font-bold text-red-600">{metrics.overdue}</div>
+        <Card variant="glass" padding="sm" className="sm:p-3 lg:p-4 bg-red-50">
+          <div className="text-xs sm:text-sm text-red-600 mb-0.5 sm:mb-1">Overdue</div>
+          <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-red-600">{metrics.overdue}</div>
         </Card>
-        <Card variant="glass" padding="md" className="bg-green-50">
-          <div className="text-sm text-green-600 mb-1">Today</div>
-          <div className="text-3xl font-bold text-green-600">{metrics.today}</div>
+        <Card variant="glass" padding="sm" className="sm:p-3 lg:p-4 bg-green-50">
+          <div className="text-xs sm:text-sm text-green-600 mb-0.5 sm:mb-1">Today</div>
+          <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-green-600">{metrics.today}</div>
         </Card>
-        <Card variant="glass" padding="md" className="bg-blue-50">
-          <div className="text-sm text-blue-600 mb-1">In 2 Days</div>
-          <div className="text-3xl font-bold text-blue-600">{metrics.twoDays}</div>
+        <Card variant="glass" padding="sm" className="sm:p-3 lg:p-4 bg-blue-50">
+          <div className="text-xs sm:text-sm text-blue-600 mb-0.5 sm:mb-1">In 2 Days</div>
+          <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-blue-600">{metrics.twoDays}</div>
         </Card>
-        <Card variant="glass" padding="md" className="bg-yellow-50">
-          <div className="text-sm text-yellow-600 mb-1">This Week</div>
-          <div className="text-3xl font-bold text-yellow-600">{metrics.upcoming}</div>
+        <Card variant="glass" padding="sm" className="sm:p-3 lg:p-4 bg-yellow-50 col-span-2 sm:col-span-1">
+          <div className="text-xs sm:text-sm text-yellow-600 mb-0.5 sm:mb-1">This Week</div>
+          <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-yellow-600">{metrics.upcoming}</div>
         </Card>
       </div>
 
-      {/* Search and Action Bar */}
-      <Card variant="glass" padding="md" className="mb-6">
-        <div className="flex flex-col md:flex-row gap-4">
+      {/* Search and Action Bar - Mobile Optimized */}
+      <Card variant="glass" padding="sm" className="sm:p-4 mb-4 sm:mb-6">
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
           {/* Search */}
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -459,14 +459,14 @@ export default function LaterStagePage() {
           {/* Add Lead Button */}
           <AddLeadButton defaultStatus="later" onSuccess={() => fetchLeadsByStatus('later')} />
           
-          {/* Export Button */}
+          {/* Export Button - Mobile Optimized */}
           <button
             onClick={handleExport}
-            className="btn btn-success flex items-center gap-2"
+            className="btn btn-success flex items-center gap-2 touch-manipulation"
             aria-label="Export leads"
           >
             <Download className="w-4 h-4" />
-            Export
+            <span className="hidden sm:inline">Export</span>
           </button>
         </div>
       </Card>
