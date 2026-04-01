@@ -15,7 +15,7 @@
     "@supabase/supabase-js": "^2.53.0",
     "clsx": "^2.1.1",
     "lucide-react": "^0.536.0",
-    "next": "15.4.5",
+    "next": "15.4.10",
     "pdf-lib": "^1.17.1",
     "puppeteer": "^24.26.1",
     "puppeteer-core": "^24.26.1",
